@@ -1,0 +1,21 @@
+{
+  "name": "@agent-guard/sdk",
+  "version": "1.0.0",
+  "description": "AgentGuard AI Firewall and Policy Enforcement SDK for Autonomous Agents on NEAR",
+  "type": "module",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "keywords": [
+    "near",
+    "ai-agent",
+    "firewall",
+    "security",
+    "prompt-injection",
+    "intents"
+  ],
+  "author": "AgentGuard Team",
+  "license": "MIT"
+}

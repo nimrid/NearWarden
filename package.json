@@ -1,0 +1,26 @@
+{
+  "name": "agent-guard",
+  "version": "1.0.0",
+  "description": "Programmable Security Firewall, Spending Policy Engine & Sandboxed Vault for Autonomous AI Agents on NEAR",
+  "type": "module",
+  "main": "sdk/src/index.js",
+  "scripts": {
+    "test": "node tests/run-judge-eval.js",
+    "test:sdk": "node --test sdk/tests/*.test.js",
+    "test:contracts": "cd contracts && cargo test",
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build"
+  },
+  "keywords": [
+    "near",
+    "ai-agents",
+    "security",
+    "firewall",
+    "policy-engine",
+    "near-intents",
+    "outlayer",
+    "tee"
+  ],
+  "author": "AgentGuard Team",
+  "license": "MIT"
+}
