@@ -1,7 +1,4 @@
-/**
- * AgentGuard Main SDK Entry Point
- */
-
+import * as nearAPI from 'near-api-js';
 import { AgentFirewall, ThreatLevel } from './firewall.js';
 import { PolicyEngine } from './policy-engine.js';
 import { NearIntentsAdapter } from './intents-adapter.js';
@@ -16,6 +13,58 @@ export class AgentGuard {
     this.intentsAdapter = new NearIntentsAdapter(config.intents);
     this.outlayer = new OutLayerClient(config.outlayer);
     this.auditHistory = [];
+
+    // Optional On-Chain NEAR Configuration
+    this.contractId = config.contractId || null;
+    this.networkId = config.networkId || 'testnet';
+    this.nodeUrl = config.nodeUrl || (this.networkId === 'mainnet' ? 'https://rpc.mainnet.near.org' : 'https://rpc.testnet.near.org');
+    this.account = config.account || null;
+    this.near = null;
+  }
+
+  /**
+   * Initializes real NEAR connection if configured.
+   */
+  async initNearConnection() {
+    if (this.near) return this.near;
+    this.near = await nearAPI.connect({
+      networkId: this.networkId,
+      nodeUrl: this.nodeUrl,
+      keyStore: new nearAPI.keyStores.InMemoryKeyStore(),
+    });
+    return this.near;
+  }
+
+  /**
+   * Queries real on-chain vault status via NEAR RPC
+   */
+  async getOnChainVaultStatus() {
+    if (!this.contractId) throw new Error('contractId not set in AgentGuard configuration');
+    const near = await this.initNearConnection();
+    const raw = await near.connection.provider.query({
+      request_type: 'call_function',
+      account_id: this.contractId,
+      method_name: 'get_vault_status',
+      args_base64: Buffer.from('{}').toString('base64'),
+      finality: 'optimistic',
+    });
+    return JSON.parse(Buffer.from(raw.result).toString());
+  }
+
+  /**
+   * Queries real on-chain pending escalation actions
+   */
+  async getOnChainPendingActions() {
+    if (!this.contractId) throw new Error('contractId not set in AgentGuard configuration');
+    const near = await this.initNearConnection();
+    const raw = await near.connection.provider.query({
+      request_type: 'call_function',
+      account_id: this.contractId,
+      method_name: 'get_pending_actions',
+      args_base64: Buffer.from('{}').toString('base64'),
+      finality: 'optimistic',
+    });
+    return JSON.parse(Buffer.from(raw.result).toString());
   }
 
   /**
@@ -27,6 +76,7 @@ export class AgentGuard {
    * @param {Object|string} [intent.args] - Call arguments
    * @param {string|number|bigint} [intent.amount] - Amount in yoctoNEAR
    * @param {boolean} [intent.isSwapIntent] - Whether this triggers NEAR Intents swap
+   * @param {boolean} [intent.executeOnChain] - Whether to broadcast transaction to live NEAR contract
    * @returns {Promise<Object>} Execution result with security trace
    */
   async processAgentIntent(intent) {
@@ -55,7 +105,7 @@ export class AgentGuard {
       return blockedRecord;
     }
 
-    // Step 2: Policy Engine Constraint Evaluation
+    // Step 2: Policy Engine Constraint Evaluation (Local pre-flight)
     const policyResult = this.policyEngine.evaluate({
       target: intent.targetContract,
       method: intent.methodName,
@@ -94,6 +144,39 @@ export class AgentGuard {
       });
     }
 
+    // Step 4: Optional On-Chain Execution via Scoped Function Call Key
+    let onChainTx = null;
+    if (intent.executeOnChain && this.account && this.contractId) {
+      try {
+        const txOutcome = await this.account.functionCall({
+          contractId: this.contractId,
+          methodName: 'execute_intent',
+          args: {
+            target: intent.targetContract,
+            method: intent.methodName,
+            args: typeof intent.args === 'string' ? intent.args : JSON.stringify(intent.args || {}),
+            amount: intent.amount ? intent.amount.toString() : null,
+          },
+          gas: '50000000000000', // 50 TGas
+          attachedDeposit: '0',
+        });
+        onChainTx = {
+          transactionHash: txOutcome.transaction.hash,
+          gasBurned: txOutcome.receipts_outcome.reduce((acc, r) => acc + (r.outcome.gas_burnt || 0), 0),
+        };
+      } catch (err) {
+        return {
+          timestamp: startTime,
+          status: 'ON_CHAIN_EXECUTION_ERROR',
+          statusCode: 500,
+          threatScore: 40,
+          threatLevel: ThreatLevel.MEDIUM,
+          intent,
+          message: `On-chain execution failed: ${err.message}`,
+        };
+      }
+    }
+
     const successRecord = {
       timestamp: startTime,
       status: 'APPROVED_AND_EXECUTED',
@@ -103,6 +186,7 @@ export class AgentGuard {
       flags: ['POLICY_COMPLIANT', 'SIGNATURE_VERIFIED'],
       intent,
       executionPayload,
+      onChainTx,
       message: `Intent successfully verified and executed on ${intent.targetContract}.`,
     };
 

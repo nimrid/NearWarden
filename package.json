@@ -8,6 +8,8 @@
     "test": "node tests/run-judge-eval.js",
     "test:sdk": "node --test sdk/tests/*.test.js",
     "test:contracts": "cd contracts && cargo test",
+    "build:contract": "./scripts/build.sh",
+    "deploy": "node scripts/deploy.js",
     "dev": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build"
   },
@@ -22,5 +24,8 @@
     "tee"
   ],
   "author": "AgentGuard Team",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "near-api-js": "^7.3.1"
+  }
 }

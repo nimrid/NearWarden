@@ -74,12 +74,51 @@ export class NearIntentsAdapter {
   }
 
   /**
-   * Simulates quotes from competitive solvers.
+   * Fetches quote from competitive solvers or calculates deterministic fallback.
    */
   async simulateQuote({ tokenIn, tokenOut, amountIn }) {
-    // Deterministic simulation based on mock pools
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const res = await fetch('https://solver-relay-v2.chaindefuser.com/rpc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          id: 1,
+          jsonrpc: '2.0',
+          method: 'quote',
+          params: [{
+            defuse_asset_identifier_in: tokenIn,
+            defuse_asset_identifier_out: tokenOut,
+            exact_amount_in: amountIn.toString(),
+            min_deadline_ms: 60000,
+          }],
+        }),
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.result && data.result.quotes && data.result.quotes.length > 0) {
+          const best = data.result.quotes[0];
+          return {
+            solver: best.solver_id || 'solver-relay.near',
+            quoteId: best.quote_hash || `quote_${Date.now()}`,
+            amountIn: amountIn.toString(),
+            expectedAmountOut: best.amount_out || '5000000',
+            executionChain: 'near',
+            gasless: true,
+            isLiveQuote: true,
+          };
+        }
+      }
+    } catch (_) {
+      // Graceful fallback to deterministic pricing if relay is unreachable
+    }
+
+    // Deterministic simulation based on pools
     const amountBn = BigInt(amountIn);
-    // Example: 1 NEAR (~5 USDC)
     const simulatedRate = tokenIn.includes('wrap.near') && tokenOut.includes('17208628') ? 5_000_000n : 1_000_000n;
     const expectedOut = (amountBn * simulatedRate) / 1_000_000_000_000_000_000_000_000n;
 
@@ -90,6 +129,7 @@ export class NearIntentsAdapter {
       expectedAmountOut: expectedOut > 0n ? expectedOut.toString() : '5000000',
       executionChain: 'near',
       gasless: true,
+      isLiveQuote: false,
     };
   }
 }

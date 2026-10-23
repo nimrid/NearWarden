@@ -134,9 +134,48 @@ OVERALL STATUS: ALL SECURITY GATES VERIFIED (5/5 PASSED)
 --------------------------------------------------------------------------------
 ```
 
+### Test 2: Run Smart Contract Rust Test Suite
+Execute the 7 on-chain vault unit tests (including cross-contract promise dispatch, escalation approval, and quota rollback):
+
+```bash
+npm run test:contracts
+```
+
+**See (Expected Output):**
+```text
+running 7 tests
+test tests::test_initialization ... ok
+test tests::test_daily_quota_exhaustion ... ok
+test tests::test_escalation_on_high_value_transaction ... ok
+test tests::test_safe_intent_execution ... ok
+test tests::test_emergency_freeze ... ok
+test tests::test_quota_rollback_on_callback_failure ... ok
+test tests::test_unauthorized_target_rejection ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+```
+
 ---
 
-### Test 2: Run SDK Unit Test Suite
+### Test 3: Build WebAssembly Contract Binary
+Compile the Rust contract into optimized WebAssembly (`wasm32-unknown-unknown`):
+
+```bash
+npm run build:contract
+```
+
+**See (Expected Output):**
+```text
+==========================================================
+  Build Complete!
+  Artifact: .../contracts/out/agent_guard_contract.wasm
+  Size: 285K
+==========================================================
+```
+
+---
+
+### Test 4: Run SDK Unit Test Suite
 Execute the unit tests for the AI Firewall and Policy Engine:
 
 ```bash
@@ -161,7 +200,7 @@ npm run test:sdk
 
 ---
 
-### Test 3: Launch the Cyberpunk Security Cockpit
+### Test 5: Launch the Cyberpunk Security Cockpit
 Start the local interactive Web3 dashboard:
 
 ```bash
@@ -170,8 +209,9 @@ npm run dev
 
 **See:**
 1. Open `http://localhost:3000` in any modern web browser.
-2. Click **"Run AI Judge Suite"** in the top bar to run all 5 test scenarios sequentially with live visual telemetry updates.
-3. Observe:
+2. Toggle between **Simulated Sandbox** and **Live Testnet RPC** mode.
+3. Click **"Run AI Judge Suite"** in the top bar to run all 5 test scenarios sequentially with live visual telemetry updates.
+4. Observe:
    - Vault state and daily quota meter updates in real time.
    - Scenario 2 jumps the Threat Meter to `95/100 (CRITICAL)` and logs forensic audit markers.
    - Scenario 4 populates the **Pending Multi-Sig Queue** with interactive `Approve` and `Reject` buttons.
@@ -197,16 +237,27 @@ The on-chain vault contract exposes the following core methods:
 
 ```rust
 // Agent Execution Entrypoint (Authorized for Scoped Function Call Keys)
+// Dispatches on-chain Promise::function_call with GAS_FOR_INTENT and rollback callback
 pub fn execute_intent(
     &mut self,
     target: AccountId,
     method: String,
     args: String,
     amount: Option<U128>,
+) -> PromiseOrValue<ExecutionResult>;
+
+// Callback for execute_intent: automatically refunds quota if external execution fails
+#[private]
+pub fn on_intent_executed(
+    &mut self,
+    caller: AccountId,
+    target: AccountId,
+    method: String,
+    amount: U128,
 ) -> ExecutionResult;
 
 // Operator Multi-Sig & Emergency Methods (Owner Only)
-pub fn approve_escalated(&mut self, action_id: u64) -> bool;
+pub fn approve_escalated(&mut self, action_id: u64) -> PromiseOrValue<bool>;
 pub fn reject_escalated(&mut self, action_id: u64) -> bool;
 pub fn emergency_freeze(&mut self);
 pub fn emergency_unfreeze(&mut self);
@@ -227,29 +278,34 @@ pub fn get_audit_log(&self, limit: Option<usize>) -> Vec<AuditEntry>;
 agent-guard/
 ├── README.md                      # Complete documentation & "Do X - See Y" judge guide
 ├── package.json                   # Root orchestrator scripts
-├── contracts/                     # NEAR Rust Smart Contract
+├── scripts/                       # Deployment and compilation tooling
+│   ├── build.sh                   # Builds wasm32-unknown-unknown release artifact
+│   └── deploy.js                  # Automated testnet deployer & key provisioner
+├── contracts/                     # NEAR Rust Smart Contract (near-sdk v5.1.0)
 │   ├── Cargo.toml
+│   ├── out/
+│   │   └── agent_guard_contract.wasm  # Compiled 285KB WASM binary
 │   └── src/
-│       ├── lib.rs                 # Contract state, key scoping, execution gate
-│       ├── policy.rs              # Daily spending caps, per-tx limits, velocity check
+│       ├── lib.rs                 # Contract state, key scoping, Promise execution & callbacks
+│       ├── policy.rs              # Daily spending caps, per-tx limits, velocity check & rollback
 │       └── escalation.rs          # Pending approval queue & status lifecycle
 ├── sdk/                           # AgentGuard AI Firewall & Enforcement SDK
 │   ├── package.json
 │   ├── src/
 │   │   ├── firewall.js            # Prompt injection & jailbreak analyzer
 │   │   ├── policy-engine.js       # Client-side validation mirror
-│   │   ├── intents-adapter.js     # NEAR Intents / Defuse slippage protector
+│   │   ├── intents-adapter.js     # NEAR Intents / Defuse slippage protector & solver RPC
 │   │   ├── outlayer-client.js     # OutLayer TEE enclave custody client
-│   │   └── index.js               # Unified AgentGuard SDK entrypoint
+│   │   └── index.js               # Unified AgentGuard SDK with near-api-js integration
 │   └── tests/
 │       ├── firewall.test.js       # Prompt injection test suite
 │       └── policy.test.js         # Spending limit & velocity tests
 ├── frontend/                      # Cyberpunk Security Cockpit (Vite + Vanilla CSS/JS)
-│   ├── index.html                 # Glassmorphic Operations Center
+│   ├── index.html                 # Glassmorphic Operations Center & RPC sync
 │   ├── package.json
 │   └── src/
 │       ├── style.css              # Dark-mode design system & animations
-│       └── app.js                 # Reactive state, telemetry & judge arena
+│       └── app.js                 # Reactive state, live NEAR RPC client & judge arena
 └── tests/
     └── run-judge-eval.js          # Machine-readable automated evaluation script
 ```

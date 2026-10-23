@@ -49,6 +49,13 @@
       </div>
 
       <div class="header-actions">
+        <div class="mode-selector">
+          <label for="select-network-mode" style="font-size: 0.75rem; color: var(--text-muted); margin-right: 6px;">MODE:</label>
+          <select id="select-network-mode" class="select-mode">
+            <option value="sim">Simulated Sandbox</option>
+            <option value="rpc">Live Testnet RPC</option>
+          </select>
+        </div>
         <button id="btn-run-all-tests" class="btn btn-secondary">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="5 3 19 12 5 21 5 3"/>
@@ -65,6 +72,14 @@
         </button>
       </div>
     </header>
+
+    <!-- Optional Live RPC Connection Bar -->
+    <div id="rpc-connect-bar" class="rpc-connect-bar" style="display: none;">
+      <span class="rpc-icon">⚡</span>
+      <input type="text" id="input-contract-id" placeholder="Enter Deployed Vault Account (e.g. agent-guard.testnet)" value="agent-guard.testnet" class="input-contract">
+      <button id="btn-sync-chain" class="btn btn-primary" style="padding: 6px 14px; font-size: 12px;">Sync On-Chain State</button>
+      <span id="rpc-status-text" class="rpc-status-msg">RPC Ready: https://rpc.testnet.near.org</span>
+    </div>
 
     <!-- Telemetry Cards -->
     <section class="telemetry-grid">

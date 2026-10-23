@@ -4,10 +4,13 @@ pub mod policy;
 use escalation::{ActionStatus, EscalationQueue, PendingAction};
 use policy::{PolicyConfig, PolicyViolation, SpendingTracker};
 
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{env, near_bindgen, require, AccountId, PanicOnDefault};
+use near_sdk::{env, near, require, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseOrValue};
+
+pub const GAS_FOR_INTENT: Gas = Gas::from_tgas(30);
+pub const GAS_FOR_CALLBACK: Gas = Gas::from_tgas(10);
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug)]
 #[serde(crate = "near_sdk::serde")]
@@ -21,7 +24,7 @@ pub struct AuditEntry {
     pub threat_score: u8,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(crate = "near_sdk::serde")]
 pub struct ExecutionResult {
     pub success: bool,
@@ -44,8 +47,8 @@ pub struct VaultStatusView {
     pub audit_log_count: usize,
 }
 
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+#[near(contract_state)]
+#[derive(PanicOnDefault)]
 pub struct AgentGuardContract {
     pub owner_id: AccountId,
     pub policy: PolicyConfig,
@@ -54,7 +57,7 @@ pub struct AgentGuardContract {
     pub audit_log: Vec<AuditEntry>,
 }
 
-#[near_bindgen]
+#[near]
 impl AgentGuardContract {
     #[init]
     pub fn new(owner_id: AccountId, policy: Option<PolicyConfig>) -> Self {
@@ -79,7 +82,7 @@ impl AgentGuardContract {
         method: String,
         args: String,
         amount: Option<U128>,
-    ) -> ExecutionResult {
+    ) -> PromiseOrValue<ExecutionResult> {
         let caller = env::predecessor_account_id();
         let current_time = env::block_timestamp();
         let amount_raw: u128 = amount.map(|a| a.0).unwrap_or(0);
@@ -104,16 +107,21 @@ impl AgentGuardContract {
                 };
                 self.audit_log.push(entry);
 
-                ExecutionResult {
-                    success: true,
-                    status_code: 200,
-                    message: format!(
-                        "Intent approved by AgentGuard policy. Executed {} on {}",
-                        method, target
-                    ),
-                    action_id: None,
-                    threat_score: 5,
-                }
+                // Dispatch on-chain cross-contract call with callback
+                let promise = Promise::new(target.clone())
+                    .function_call(
+                        method.clone(),
+                        args.into_bytes(),
+                        NearToken::from_yoctonear(amount_raw),
+                        GAS_FOR_INTENT,
+                    )
+                    .then(
+                        Self::ext(env::current_account_id())
+                            .with_static_gas(GAS_FOR_CALLBACK)
+                            .on_intent_executed(caller, target, method, U128(amount_raw))
+                    );
+
+                PromiseOrValue::Promise(promise)
             }
             Err(PolicyViolation::ExceedsPerTxCap { amount, cap }) => {
                 // If value exceeds single-tx limit but contract is not frozen, escalate to human approval
@@ -136,7 +144,7 @@ impl AgentGuardContract {
                 };
                 self.audit_log.push(entry);
 
-                ExecutionResult {
+                PromiseOrValue::Value(ExecutionResult {
                     success: false,
                     status_code: 202,
                     message: format!(
@@ -145,7 +153,7 @@ impl AgentGuardContract {
                     ),
                     action_id: Some(action_id),
                     threat_score: 65,
-                }
+                })
             }
             Err(err) => {
                 let (error_msg, code, threat_score) = match err {
@@ -170,7 +178,7 @@ impl AgentGuardContract {
                             calls_in_window, max_allowed
                         ), 429, 70)
                     }
-                    _ => ("Policy violation".to_string(), 400, 50),
+                    PolicyViolation::ExceedsPerTxCap { .. } => unreachable!(),
                 };
 
                 let entry = AuditEntry {
@@ -184,13 +192,55 @@ impl AgentGuardContract {
                 };
                 self.audit_log.push(entry);
 
-                ExecutionResult {
+                PromiseOrValue::Value(ExecutionResult {
                     success: false,
                     status_code: code,
                     message: error_msg,
                     action_id: None,
                     threat_score,
-                }
+                })
+            }
+        }
+    }
+
+    /// Callback for execute_intent: validates execution and refunds quota if the call failed
+    #[private]
+    pub fn on_intent_executed(
+        &mut self,
+        caller: AccountId,
+        target: AccountId,
+        method: String,
+        amount: U128,
+    ) -> ExecutionResult {
+        let success = env::promise_results_count() > 0 && env::promise_result_checked(0, 1024 * 1024).is_ok();
+
+        if !success {
+            self.tracker.rollback_spend(amount.0);
+
+            self.audit_log.push(AuditEntry {
+                timestamp_ns: env::block_timestamp(),
+                caller,
+                target: target.clone(),
+                method: method.clone(),
+                amount,
+                status: "CROSS_CONTRACT_FAILED_QUOTA_REVERTED".to_string(),
+                threat_score: 30,
+            });
+
+            ExecutionResult {
+                success: false,
+                status_code: 500,
+                message: format!("Execution of {} on {} failed; quota refunded", method, target),
+                action_id: None,
+                threat_score: 30,
+            }
+        } else {
+            ExecutionResult {
+                success: true,
+                status_code: 200,
+                message: format!("Intent executed successfully on {}", target),
+                action_id: None,
+                threat_score: 5,
             }
         }
     }
@@ -227,25 +277,58 @@ impl AgentGuardContract {
         });
     }
 
-    /// Approve an escalated transaction (Human-in-the-Loop)
-    pub fn approve_escalated(&mut self, action_id: u64) -> bool {
+    /// Approve an escalated transaction (Human-in-the-Loop) and execute its payload on-chain
+    pub fn approve_escalated(&mut self, action_id: u64) -> PromiseOrValue<bool> {
         self.assert_owner();
         let action = self.escalation.get_action_mut(action_id).expect("Action not found");
         require!(action.status == ActionStatus::Pending, "Action is not pending");
 
         action.status = ActionStatus::Approved;
 
+        let target = action.target.clone();
+        let method = action.method.clone();
+        let args = action.args.clone().into_bytes();
+        let deposit = action.deposit;
+
         self.audit_log.push(AuditEntry {
             timestamp_ns: env::block_timestamp(),
             caller: env::predecessor_account_id(),
-            target: action.target.clone(),
-            method: action.method.clone(),
-            amount: U128(action.deposit),
-            status: format!("MANUALLY_APPROVED_ACTION_{}", action_id),
+            target: target.clone(),
+            method: method.clone(),
+            amount: U128(deposit),
+            status: format!("MANUALLY_APPROVED_AND_DISPATCHED_ACTION_{}", action_id),
             threat_score: 10,
         });
 
-        true
+        let promise = Promise::new(target)
+            .function_call(
+                method,
+                args,
+                NearToken::from_yoctonear(deposit),
+                GAS_FOR_INTENT,
+            )
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_FOR_CALLBACK)
+                    .on_escalated_executed(action_id)
+            );
+
+        PromiseOrValue::Promise(promise)
+    }
+
+    /// Callback for approve_escalated: records on-chain outcome in escalation queue
+    #[private]
+    pub fn on_escalated_executed(&mut self, action_id: u64) -> bool {
+        let success = env::promise_results_count() > 0 && env::promise_result_checked(0, 1024 * 1024).is_ok();
+
+        if let Some(action) = self.escalation.get_action_mut(action_id) {
+            action.status = if success {
+                ActionStatus::Executed
+            } else {
+                ActionStatus::Rejected
+            };
+        }
+        success
     }
 
     /// Reject an escalated transaction
@@ -326,7 +409,7 @@ mod tests {
     use near_sdk::test_utils::VMContextBuilder;
     use near_sdk::testing_env;
 
-    fn get_context(predecessor: AccountId, is_init: bool) -> VMContextBuilder {
+    fn get_context(predecessor: AccountId, _is_init: bool) -> VMContextBuilder {
         let mut builder = VMContextBuilder::new();
         builder
             .current_account_id("vault.near".parse().unwrap())
@@ -344,7 +427,7 @@ mod tests {
         let contract = AgentGuardContract::new("alice.near".parse().unwrap(), None);
         let status = contract.get_vault_status();
 
-        assert_eq!(status.owner_id, "alice.near".parse().unwrap());
+        assert_eq!(status.owner_id, "alice.near".parse::<AccountId>().unwrap());
         assert!(!status.is_frozen);
         assert_eq!(status.daily_spent.0, 0);
     }
@@ -364,8 +447,12 @@ mod tests {
             Some(U128(500_000_000_000_000_000_000_000)), // 0.5 NEAR
         );
 
-        assert!(res.success);
-        assert_eq!(res.status_code, 200);
+        match res {
+            PromiseOrValue::Promise(_) => {
+                // Verified: Promise dispatched on-chain for the target contract
+            }
+            PromiseOrValue::Value(v) => panic!("Expected Promise, got Value: {:?}", v),
+        }
 
         let status = contract.get_vault_status();
         assert_eq!(status.daily_spent.0, 500_000_000_000_000_000_000_000);
@@ -379,12 +466,15 @@ mod tests {
         let mut contract = AgentGuardContract::new("alice.near".parse().unwrap(), None);
 
         // Agent attempts calling an unwhitelisted suspicious contract
-        let res = contract.execute_intent(
+        let res = match contract.execute_intent(
             "malicious-drainer.near".parse().unwrap(),
             "drain_all".to_string(),
             "{}".to_string(),
             Some(U128(1_000_000_000_000_000_000_000_000)),
-        );
+        ) {
+            PromiseOrValue::Value(v) => v,
+            PromiseOrValue::Promise(_) => panic!("Expected policy rejection"),
+        };
 
         assert!(!res.success);
         assert_eq!(res.status_code, 403);
@@ -399,12 +489,15 @@ mod tests {
         let mut contract = AgentGuardContract::new("alice.near".parse().unwrap(), None);
 
         // Attempt spending 5 NEAR (exceeds default 2 NEAR per-tx cap)
-        let res = contract.execute_intent(
+        let res = match contract.execute_intent(
             "wrap.near".parse().unwrap(),
             "ft_transfer".to_string(),
             r#"{"receiver_id":"bob.near","amount":"5000000000000000000000000"}"#.to_string(),
             Some(U128(5_000_000_000_000_000_000_000_000)),
-        );
+        ) {
+            PromiseOrValue::Value(v) => v,
+            PromiseOrValue::Promise(_) => panic!("Expected escalation value"),
+        };
 
         assert!(!res.success);
         assert_eq!(res.status_code, 202);
@@ -418,7 +511,11 @@ mod tests {
         let owner_context = get_context("alice.near".parse().unwrap(), false);
         testing_env!(owner_context.build());
 
-        assert!(contract.approve_escalated(res.action_id.unwrap()));
+        let approved_res = contract.approve_escalated(res.action_id.unwrap());
+        match approved_res {
+            PromiseOrValue::Promise(_) => {}
+            PromiseOrValue::Value(val) => assert!(val),
+        }
         let updated_pending = contract.get_pending_actions();
         assert_eq!(updated_pending[0].status, ActionStatus::Approved);
     }
@@ -438,16 +535,19 @@ mod tests {
                 "{}".to_string(),
                 Some(U128(2_000_000_000_000_000_000_000_000)),
             );
-            assert!(res.success);
+            assert!(matches!(res, PromiseOrValue::Promise(_)));
         }
 
         // 6th transaction must be blocked by daily spending quota
-        let res = contract.execute_intent(
+        let res = match contract.execute_intent(
             "wrap.near".parse().unwrap(),
             "ft_transfer".to_string(),
             "{}".to_string(),
             Some(U128(1_000_000_000_000_000_000_000_000)),
-        );
+        ) {
+            PromiseOrValue::Value(v) => v,
+            PromiseOrValue::Promise(_) => panic!("Expected daily quota block"),
+        };
 
         assert!(!res.success);
         assert_eq!(res.status_code, 429);
@@ -469,15 +569,53 @@ mod tests {
         let agent_context = get_context("agent.near".parse().unwrap(), false);
         testing_env!(agent_context.build());
 
-        let res = contract.execute_intent(
+        let res = match contract.execute_intent(
             "intents.near".parse().unwrap(),
             "execute_intent".to_string(),
             "{}".to_string(),
             Some(U128(100_000_000_000_000_000_000)),
-        );
+        ) {
+            PromiseOrValue::Value(v) => v,
+            PromiseOrValue::Promise(_) => panic!("Expected freeze rejection"),
+        };
 
         assert!(!res.success);
         assert_eq!(res.status_code, 503);
         assert!(res.message.contains("Vault is emergency frozen"));
+    }
+
+    #[test]
+    fn test_quota_rollback_on_callback_failure() {
+        let context = get_context("agent.near".parse().unwrap(), false);
+        testing_env!(context.build());
+
+        let mut contract = AgentGuardContract::new("alice.near".parse().unwrap(), None);
+
+        // Safe micro-swap on intents.near (0.5 NEAR)
+        let _ = contract.execute_intent(
+            "intents.near".parse().unwrap(),
+            "execute_intent".to_string(),
+            "{}".to_string(),
+            Some(U128(500_000_000_000_000_000_000_000)),
+        );
+
+        assert_eq!(contract.get_vault_status().daily_spent.0, 500_000_000_000_000_000_000_000);
+
+        // Simulate callback when external execution failed
+        let self_context = get_context("vault.near".parse().unwrap(), false);
+        testing_env!(self_context.build());
+
+        let callback_res = contract.on_intent_executed(
+            "agent.near".parse().unwrap(),
+            "intents.near".parse().unwrap(),
+            "execute_intent".to_string(),
+            U128(500_000_000_000_000_000_000_000),
+        );
+
+        assert!(!callback_res.success);
+        assert_eq!(callback_res.status_code, 500);
+
+        // Quota has been refunded!
+        assert_eq!(contract.get_vault_status().daily_spent.0, 0);
     }
 }

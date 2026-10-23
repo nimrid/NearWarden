@@ -368,5 +368,111 @@ document.getElementById('slider-pertx-cap')?.addEventListener('input', (e) => {
   renderTelemetry();
 });
 
+// Mode Toggle & Live NEAR RPC Client
+const elSelectMode = document.getElementById('select-network-mode');
+const elRpcBar = document.getElementById('rpc-connect-bar');
+const elInputContractId = document.getElementById('input-contract-id');
+const elBtnSyncChain = document.getElementById('btn-sync-chain');
+const elRpcStatusText = document.getElementById('rpc-status-text');
+
+elSelectMode?.addEventListener('change', (e) => {
+  if (e.target.value === 'rpc') {
+    elRpcBar.style.display = 'flex';
+    syncOnChainState();
+  } else {
+    elRpcBar.style.display = 'none';
+    elRpcStatusText.textContent = 'RPC Ready: https://rpc.testnet.near.org';
+  }
+});
+
+async function queryNearRpc(contractId, methodName, argsObj = {}) {
+  const argsBase64 = btoa(JSON.stringify(argsObj));
+  const startTime = Date.now();
+  const res = await fetch('https://rpc.testnet.near.org', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 'agentguard-query',
+      method: 'query',
+      params: {
+        request_type: 'call_function',
+        finality: 'final',
+        account_id: contractId,
+        method_name: methodName,
+        args_base64: argsBase64,
+      },
+    }),
+  });
+
+  const latency = Date.now() - startTime;
+  const json = await res.json();
+
+  if (json.error) {
+    throw new Error(json.error.data || json.error.message || 'RPC Query failed');
+  }
+
+  const rawBytes = json.result.result;
+  const decodedStr = new TextDecoder().decode(new Uint8Array(rawBytes));
+  return { data: JSON.parse(decodedStr), latency, blockHeight: json.result.block_height };
+}
+
+async function syncOnChainState() {
+  const contractId = elInputContractId?.value.trim() || 'agent-guard.testnet';
+  if (elRpcStatusText) elRpcStatusText.textContent = `Querying ${contractId} via testnet RPC...`;
+
+  try {
+    const { data: vaultStatus, latency, blockHeight } = await queryNearRpc(contractId, 'get_vault_status');
+    state.isFrozen = Boolean(vaultStatus.is_frozen);
+    state.dailyCap = Number(BigInt(vaultStatus.daily_spending_cap) / 1000000000000000000000000n) || 10.0;
+    state.dailySpent = Number(BigInt(vaultStatus.daily_spent) / 1000000000000000000000000n) || 0.0;
+    state.perTxCap = Number(BigInt(vaultStatus.per_tx_cap) / 1000000000000000000000000n) || 2.0;
+
+    // Fetch on-chain audit log
+    try {
+      const { data: onChainLogs } = await queryNearRpc(contractId, 'get_audit_log', { limit: 10 });
+      if (Array.isArray(onChainLogs) && onChainLogs.length > 0) {
+        state.auditLog = onChainLogs.map(l => ({
+          time: new Date(Number(BigInt(l.timestamp_ns) / 1000000n)).toLocaleTimeString(),
+          status: l.status.startsWith('BLOCKED') ? 'REJECTED' : 'APPROVED',
+          type: l.status.startsWith('BLOCKED') ? 'block' : 'pass',
+          score: l.threat_score,
+          target: l.target,
+          msg: `On-chain [${l.method}]: ${l.status}`
+        }));
+      }
+    } catch (_) {}
+
+    // Fetch on-chain pending actions
+    try {
+      const { data: pending } = await queryNearRpc(contractId, 'get_pending_actions');
+      if (Array.isArray(pending)) {
+        state.pendingActions = pending.map(p => ({
+          id: p.action_id,
+          target: p.target,
+          method: p.method,
+          amount: Number(BigInt(p.deposit) / 1000000000000000000000000n),
+          cap: state.perTxCap,
+          prompt: `On-chain escalated call to ${p.target}`
+        }));
+      }
+    } catch (_) {}
+
+    renderTelemetry();
+    if (elRpcStatusText) {
+      elRpcStatusText.textContent = `● Synced (${latency}ms) • Block #${blockHeight} • Owner: ${vaultStatus.owner_id}`;
+      elRpcStatusText.style.color = '#10b981';
+    }
+    logEvent('RPC_SYNC_SUCCESS', 'pass', 0, contractId, `Live on-chain state synced from block #${blockHeight}`);
+  } catch (err) {
+    if (elRpcStatusText) {
+      elRpcStatusText.textContent = `Contract '${contractId}' not deployed on testnet yet. Run 'node scripts/deploy.js'`;
+      elRpcStatusText.style.color = '#f59e0b';
+    }
+  }
+}
+
+elBtnSyncChain?.addEventListener('click', syncOnChainState);
+
 // Initial Render
 renderTelemetry();

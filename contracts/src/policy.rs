@@ -1,4 +1,4 @@
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::AccountId;
 
@@ -137,5 +137,13 @@ impl SpendingTracker {
         self.call_timestamps_ns.push(current_time_ns);
 
         Ok(())
+    }
+
+    /// Reverts a recorded spend if the cross-contract execution fails
+    pub fn rollback_spend(&mut self, amount: u128) {
+        self.current_day_spent = self.current_day_spent.saturating_sub(amount);
+        if !self.call_timestamps_ns.is_empty() {
+            self.call_timestamps_ns.pop();
+        }
     }
 }
