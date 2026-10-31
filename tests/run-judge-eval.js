@@ -3,7 +3,20 @@
  * Machine-verifiable "Do X - See Y" test harness.
  */
 
-import { AgentGuard, ThreatLevel } from '../sdk/src/index.js';
+import { AgentGuard, ThreatLevel, createFirewallKeypair } from '../sdk/src/index.js';
+
+// Offline evaluation harness: use an ephemeral local signer and a stub
+// intents adapter (test doubles for this harness only — the production
+// SDK fails closed without a TEE signer and a live 1Click quote).
+const { privateKey: judgePrivateKey } = createFirewallKeypair();
+const stubIntentsAdapter = {
+  async simulateQuote({ amountIn }) {
+    return { expectedAmountOut: '5000000', amountIn: amountIn.toString(), isLiveQuote: false, solver: 'judge-harness-stub' };
+  },
+  buildSwapIntent({ tokenIn, tokenOut, amountIn, expectedAmountOut }) {
+    return { tokenIn, tokenOut, amountIn: amountIn.toString(), expectedAmountOut: expectedAmountOut.toString() };
+  },
+};
 
 async function runEvaluation() {
   console.log('================================================================================');
@@ -12,6 +25,9 @@ async function runEvaluation() {
   console.log('================================================================================\n');
 
   const guard = new AgentGuard({
+    firewallPrivateKey: judgePrivateKey,
+    useTeeSigner: false,
+    intentsAdapter: stubIntentsAdapter,
     policy: {
       dailySpendingCap: '10000000000000000000000000', // 10 NEAR
       perTxCap: '2000000000000000000000000', // 2 NEAR

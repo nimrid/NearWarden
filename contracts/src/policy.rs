@@ -1,9 +1,19 @@
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::AccountId;
+use near_sdk::{AccountId, PublicKey};
 
 pub const ONE_DAY_NS: u64 = 86_400_000_000_000; // 24 hours in nanoseconds
 pub const ONE_HOUR_NS: u64 = 3_600_000_000_000; // 1 hour in nanoseconds
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(crate = "near_sdk::serde")]
+pub struct FirewallAttestation {
+    pub threat_score: u8,
+    pub timestamp_ms: u64,
+    #[serde(default)]
+    pub nonce: u64,
+    pub signature: String, // hex-encoded 64-byte Ed25519 signature
+}
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(crate = "near_sdk::serde")]
@@ -20,6 +30,29 @@ pub struct PolicyConfig {
     pub max_velocity_per_hour: u32,
     /// Emergency kill-switch: if true, all agent interactions are blocked
     pub emergency_frozen: bool,
+    /// Optional Ed25519 public key of the AI Firewall signer (enforces cryptographic attestation)
+    #[serde(default)]
+    pub firewall_public_key: Option<PublicKey>,
+    /// Maximum allowed age of firewall attestation in milliseconds (default: 300,000 = 5 mins)
+    #[serde(default)]
+    pub max_attestation_age_ms: Option<u64>,
+    /// Maximum threat score accepted by the contract (default: 75)
+    #[serde(default)]
+    pub max_threat_score: Option<u8>,
+    /// Optional biometric supervisor WebAuthn Passkey credential hash
+    #[serde(default)]
+    pub supervisor_passkey_hash: Option<String>,
+    /// Optional NEAR MPC Signer Contract ID (default: "v1.signer-prod.testnet")
+    #[serde(default)]
+    pub mpc_contract_id: Option<AccountId>,
+    /// Accounts authorized to call execute_intent / request_chain_signature.
+    /// The owner is always authorized. Empty means no agent is authorized.
+    #[serde(default)]
+    pub authorized_callers: Vec<AccountId>,
+    /// Hex-encoded uncompressed SEC1 P-256 public key (65 bytes) of the
+    /// supervisor passkey. Required for cryptographic approval verification.
+    #[serde(default)]
+    pub supervisor_passkey_public_key: Option<String>,
 }
 
 impl Default for PolicyConfig {
@@ -31,6 +64,8 @@ impl Default for PolicyConfig {
                 "wrap.near".parse().unwrap(),
                 "intents.near".parse().unwrap(),
                 "v2.ref-finance.near".parse().unwrap(),
+                "v1.signer-prod.testnet".parse().unwrap(),
+                "v1.signer".parse().unwrap(),
             ],
             allowed_methods: vec![
                 "ft_transfer".to_string(),
@@ -38,9 +73,18 @@ impl Default for PolicyConfig {
                 "execute_intent".to_string(),
                 "storage_deposit".to_string(),
                 "near_deposit".to_string(),
+                "sign".to_string(),
+                "request_chain_signature".to_string(),
             ],
             max_velocity_per_hour: 20,
             emergency_frozen: false,
+            firewall_public_key: None,
+            max_attestation_age_ms: Some(300_000),
+            max_threat_score: Some(75),
+            supervisor_passkey_hash: None,
+            mpc_contract_id: Some("v1.signer-prod.testnet".parse().unwrap()),
+            authorized_callers: Vec::new(),
+            supervisor_passkey_public_key: None,
         }
     }
 }
@@ -136,6 +180,55 @@ impl SpendingTracker {
         self.current_day_spent = projected_daily_spend;
         self.call_timestamps_ns.push(current_time_ns);
 
+        Ok(())
+    }
+
+    /// Re-validates an escalated action at approval time and records its spend.
+    /// Per-tx cap is intentionally skipped: exceeding it is why the action was
+    /// escalated. Freeze, whitelists, daily quota, and velocity still apply.
+    pub fn validate_escalated_and_record(
+        &mut self,
+        policy: &PolicyConfig,
+        target: &AccountId,
+        method: &str,
+        amount: u128,
+        current_time_ns: u64,
+    ) -> Result<(), PolicyViolation> {
+        if policy.emergency_frozen {
+            return Err(PolicyViolation::VaultFrozen);
+        }
+        if !policy.allowed_targets.is_empty() && !policy.allowed_targets.contains(target) {
+            return Err(PolicyViolation::TargetNotAllowed(target.to_string()));
+        }
+        let is_chain_signature = method.starts_with("sign_multichain:");
+        if !is_chain_signature
+            && !policy.allowed_methods.is_empty()
+            && !policy.allowed_methods.iter().any(|m| m == method)
+        {
+            return Err(PolicyViolation::MethodNotAllowed(method.to_string()));
+        }
+        if current_time_ns >= self.last_reset_timestamp_ns.saturating_add(ONE_DAY_NS) {
+            self.current_day_spent = 0;
+            self.last_reset_timestamp_ns = current_time_ns;
+        }
+        let projected_daily_spend = self.current_day_spent.saturating_add(amount);
+        if projected_daily_spend > policy.daily_spending_cap {
+            return Err(PolicyViolation::ExceedsDailyQuota {
+                spent_today: self.current_day_spent,
+                attempted: amount,
+                cap: policy.daily_spending_cap,
+            });
+        }
+        let cutoff_time = current_time_ns.saturating_sub(ONE_HOUR_NS);
+        self.call_timestamps_ns.retain(|&ts| ts >= cutoff_time);
+        if self.call_timestamps_ns.len() as u32 >= policy.max_velocity_per_hour {
+            return Err(PolicyViolation::VelocityLimitExceeded {
+                calls_in_window: self.call_timestamps_ns.len() as u32,
+                max_allowed: policy.max_velocity_per_hour,
+            });
+        }
+        self.current_day_spent = projected_daily_spend;
+        self.call_timestamps_ns.push(current_time_ns);
         Ok(())
     }
 

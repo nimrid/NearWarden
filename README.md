@@ -52,12 +52,14 @@ Autonomous AI agents (trading bots, multi-agent swarms, autonomous procurement a
 │  - Destination & Method Allowlist (wrap.near, intents.near)     │
 │  - Human-in-the-Loop Escalation Queue (Actions > Cap)           │
 │  - Emergency Circuit Breaker (Instant 1-Tx Freeze)              │
-└───────────────────────────────┬─────────────────────────────────┘
-                                │
-               ┌────────────────┴────────────────┐
-               ▼                                 ▼
-      NEAR Intents Protocol            OutLayer TEE Enclave
-    (intents.near / Defuse)          (Intel TDX Custody & Binding)
+│  - Multi-Chain Policy Gate for MPC Signing (v1.signer)          │
+└───────────────┬─────────────────┬───────────────────────────────┘
+                │                 │
+       ┌────────┴────────┐        └──────────────┐
+       ▼                 ▼                       ▼
+NEAR Intents Protocol   OutLayer TEE Enclave    NEAR Chain Signatures
+(intents.near / Defuse) (Intel TDX Custody)     (v1.signer MPC Network)
+ [Gasless Cross-Swaps]   [Hardware Attestation]  [Native Base / EVM / BTC]
 ```
 
 ### NEAR Primitives Leveraged:
@@ -143,16 +145,18 @@ npm run test:contracts
 
 **See (Expected Output):**
 ```text
-running 7 tests
-test tests::test_initialization ... ok
+running 9 tests
 test tests::test_daily_quota_exhaustion ... ok
-test tests::test_escalation_on_high_value_transaction ... ok
-test tests::test_safe_intent_execution ... ok
+test tests::test_firewall_attestation_tampered_signature_rejected - should panic ... ok
 test tests::test_emergency_freeze ... ok
-test tests::test_quota_rollback_on_callback_failure ... ok
+test tests::test_escalation_on_high_value_transaction ... ok
+test tests::test_firewall_bypass_rejected_when_attestation_missing - should panic ... ok
+test tests::test_initialization ... ok
+test tests::test_safe_intent_execution ... ok
 test tests::test_unauthorized_target_rejection ... ok
+test tests::test_quota_rollback_on_callback_failure ... ok
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 
 ---
@@ -169,14 +173,14 @@ npm run build:contract
 ==========================================================
   Build Complete!
   Artifact: .../contracts/out/agent_guard_contract.wasm
-  Size: 285K
+  Size: 214K
 ==========================================================
 ```
 
 ---
 
 ### Test 4: Run SDK Unit Test Suite
-Execute the unit tests for the AI Firewall and Policy Engine:
+Execute the unit tests for the AI Firewall, Policy Engine, Cross-Chain Adapters, Cryptographic Attestation, and Framework Middleware:
 
 ```bash
 npm run test:sdk
@@ -184,17 +188,37 @@ npm run test:sdk
 
 **See (Expected Output):**
 ```text
+✔ Attestation - Generates valid Ed25519 keypair
+✔ Attestation - Signs intent and verifies against public key
+✔ Attestation - Rejects tampered target or amount
+✔ Attestation - Rejects expired attestation
+✔ AgentGuard - Integrates firewall private key and attaches attestation to executed intent
+✔ Attestation - Generates unique nonces to prevent replay attacks and rejects tampered nonces
 ✔ AgentFirewall - Approves legitimate micro-swap intent
 ✔ AgentFirewall - Blocks prompt injection attempting to override system directives
 ✔ AgentFirewall - Blocks treasury drainage attempts
 ✔ AgentFirewall - Intercepts blacklisted phishing/drainer contracts
+✔ Cross-Chain - Validates addresses across Solana, Base, Ethereum, and Bitcoin
+✔ Cross-Chain - Builds valid cross-chain intent payload with bounded slippage
+✔ Cross-Chain - Rejects slippage exceeding 5.0% security limit
+✔ ElizaOS Middleware - Approves safe DeFi action and halts prompt injection
+✔ LangChain Middleware - Wraps tool, passes clean input, and blocks attacks
+✔ AgentGuard Middleware - Functional interceptor interrupts malicious execution
+✔ OutLayerClient - Parses payment key owner and nonce correctly
+✔ OutLayerClient - Builds valid TEE binding policy specification
+✔ NearIntentsAdapter - Builds valid NEP-413 intent message with slippage guardrails
+✔ NearIntentsAdapter - Rejects slippage exceeding 5.0% security bound
+✔ AgentFirewall - Gracefully parses Claude responses with or without markdown codeblocks
+✔ OutLayerClient - Anchors firewall key in Intel TDX TEE Enclave and exports NEAR public key
+✔ OutLayerClient - Signs attestation in TEE enclave and enforces security threshold
+✔ AgentGuard - End-to-end intent processing with OutLayer TEE anchored attestation
 ✔ PolicyEngine - Allows spending within per-tx and daily limits
 ✔ PolicyEngine - Rejects target contract not in whitelist
 ✔ PolicyEngine - Flags transactions exceeding per-tx cap for escalation
 ✔ PolicyEngine - Blocks execution when daily quota is exhausted
 ✔ PolicyEngine - Emergency freeze halts all operations
-ℹ tests 9
-ℹ pass 9
+ℹ tests 29
+ℹ pass 29
 ℹ fail 0
 ```
 
@@ -237,6 +261,7 @@ The on-chain vault contract exposes the following core methods:
 
 ```rust
 // Agent Execution Entrypoint (Authorized for Scoped Function Call Keys)
+// Enforces Dual-Gate Security: Cryptographic AI Firewall Attestation + On-Chain Spending Engine
 // Dispatches on-chain Promise::function_call with GAS_FOR_INTENT and rollback callback
 pub fn execute_intent(
     &mut self,
@@ -244,6 +269,7 @@ pub fn execute_intent(
     method: String,
     args: String,
     amount: Option<U128>,
+    attestation: Option<FirewallAttestation>,
 ) -> PromiseOrValue<ExecutionResult>;
 
 // Callback for execute_intent: automatically refunds quota if external execution fails
@@ -257,22 +283,149 @@ pub fn on_intent_executed(
 ) -> ExecutionResult;
 
 // Operator Multi-Sig & Emergency Methods (Owner Only)
-pub fn approve_escalated(&mut self, action_id: u64) -> PromiseOrValue<bool>;
+pub fn approve_escalated(&mut self, action_id: u64, passkey_signature: Option<String>) -> PromiseOrValue<bool>;
 pub fn reject_escalated(&mut self, action_id: u64) -> bool;
 pub fn emergency_freeze(&mut self);
 pub fn emergency_unfreeze(&mut self);
 pub fn update_policy(&mut self, new_policy: PolicyConfig);
+pub fn set_firewall_public_key(&mut self, public_key: Option<PublicKey>);
+pub fn set_supervisor_passkey(&mut self, passkey_hash: Option<String>);
 
 // Public View Methods
 pub fn get_vault_status(&self) -> VaultStatusView;
 pub fn get_policy(&self) -> PolicyConfig;
 pub fn get_pending_actions(&self) -> Vec<PendingAction>;
 pub fn get_audit_log(&self, limit: Option<usize>) -> Vec<AuditEntry>;
+pub fn is_attestation_consumed(&self, digest_hex: String) -> bool;
+```
+
+### Dual-Enclave Architecture: OutLayer Intel TDX + Biometric WebAuthn Passkeys
+
+AgentGuard establishes a **Dual-Enclave Separation of Powers** that divides authority between autonomous machine agents and human supervisors:
+
+1. **Machine Realm (Autonomous Cloud Enclave)**:
+   - The AI Agent operates exclusively with Scoped Function Call Keys (FCKs).
+   - The Firewall attestation signer is hardware-sealed inside an **OutLayer Intel TDX hardware enclave** (`outlayer.anchorFirewallKeyInTee()`). The private key never touches host memory or disk.
+   - The enclave autonomously enforces the safety threshold ($\text{threatScore} \le 75$) before issuing the Ed25519 signature.
+
+2. **Human Realm (Client Device Secure Enclave)**:
+   - For high-value transactions (> 2 NEAR) and emergency actions, authority escalates to a **Human Supervisor**.
+   - Instead of risky plaintext seed phrases or browser hot wallets, the supervisor authenticates via **Biometric WebAuthn Passkeys** (Touch ID, Face ID, Windows Hello, YubiKey).
+   - Biometric presence generates a hardware-backed NIST P-256 (ES256) signature bound to the specific action ID and intent parameters.
+   - The NEAR smart contract anchors the supervisor's passkey identity (`set_supervisor_passkey`) and strictly enforces biometric proof on escalation approvals (`approve_escalated(action_id, passkey_signature)`).
+
+3. **Replay-Protection Nullifiers (`LookupSet<[u8; 32]>`)**:
+   - Every verified off-chain attestation digest is permanently marked as consumed in on-chain storage.
+   - Prevents replay attacks across all transaction windows.
+
+4. **Completely Seedless Vault Lifecycle**:
+   - Autonomous Agent: Scoped Function Call Keys inside TEE.
+   - Human Supervisor: Biometric Touch ID inside Apple/Android Secure Enclave.
+   - Zero private keys in plaintext RAM. Zero seed phrases to compromise.
+
+
+
+---
+
+## 6. Developer SDK: Chain Abstraction & Agent Framework Middleware
+
+AgentGuard includes first-class adapters for cross-chain intents and plug-and-play middleware for autonomous agent frameworks:
+
+### 1. Cross-Chain Intents (30+ Blockchains via 1Click Defuse)
+Safely route cross-chain swaps between NEAR, Solana, Base, Ethereum, Bitcoin, and Arbitrum with automatic address format validation and strict slippage bounds:
+
+```javascript
+import { NearIntentsAdapter } from '@near-agent-guard/sdk';
+
+const adapter = new NearIntentsAdapter({ maxSlippagePercent: 1.5 });
+
+// Build a cross-chain swap from NEAR to Solana
+const intent = adapter.buildCrossChainSwapIntent({
+  originAsset: 'near:wNEAR',
+  destinationAsset: 'solana:SOL',
+  destinationChain: 'solana',
+  recipientAddress: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+  amountIn: '1000000000000000000000000', // 1 NEAR
+  expectedAmountOut: '47000000',
+});
+
+// Fetch live cryptographically signed quote from Defuse solver network
+const quote = await adapter.simulateCrossChainQuote({
+  originAsset: 'near:wNEAR',
+  destinationAsset: 'solana:SOL',
+  destinationChain: 'solana',
+  recipientAddress: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+  amountIn: '1000000000000000000000000',
+});
+```
+
+### 2. ElizaOS Plugin (`createElizaPlugin`)
+Protect autonomous ElizaOS agents by dropping in the AgentGuard security plugin:
+
+```javascript
+import { AgentGuard, createElizaPlugin } from '@near-agent-guard/sdk';
+
+const guard = new AgentGuard({ contractId: 'myvault.testnet' });
+const elizaPlugin = createElizaPlugin(guard);
+
+// Register in Eliza runtime
+runtime.registerPlugin(elizaPlugin);
+```
+
+### 3. LangChain Tool Wrapper (`wrapLangChainTool`)
+Wrap any LangChain tool with pre-flight prompt injection scanning and on-chain spending checks:
+
+```javascript
+import { AgentGuard, wrapLangChainTool } from '@near-agent-guard/sdk';
+
+const guard = new AgentGuard();
+const secureSwapTool = wrapLangChainTool(rawNearSwapTool, guard);
+
+// Use in any LangChain agent executor
+const result = await secureSwapTool.invoke({
+  prompt: 'Swap 0.5 NEAR to USDC',
+  amount: '500000000000000000000000',
+});
+```
+
+### 4. NEAR Chain Signatures (Arbitrary Execution on Base / EVM / Bitcoin)
+Autonomous agents govern native accounts on Base, Ethereum, Arbitrum, and Bitcoin from a single NEAR account using NEAR's decentralized Threshold MPC network (`v1.signer`):
+
+```javascript
+import { AgentGuard, ChainSignatures } from '@near-agent-guard/sdk';
+
+const guard = new AgentGuard({
+  contractId: 'vault.testnet',
+  networkId: 'testnet',
+});
+
+// 1. Mathematically derive deterministic EVM address for Base
+const baseWallet = guard.deriveForeignAddress({
+  accountId: 'my-agent.testnet',
+  path: 'ethereum,1',
+  chain: 'base',
+});
+console.log('Agent Base Address:', baseWallet.address); // e.g. 0x6cCacC...
+
+// 2. Prepare, policy-verify, sign via NEAR MPC, and assemble raw EIP-1559 tx
+const execution = await guard.executeMultiChainEvm({
+  evmTx: {
+    to: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+    value: 100000000000000n, // wei
+    chainId: 8453,           // Base
+    nonce: 0,
+  },
+  path: 'ethereum,1',
+  foreignChain: 'base',
+  estimatedAmount: '100000000000000000000000', // 0.1 NEAR equivalent
+});
+
+console.log('Signed Raw Tx Hex ready for Base RPC:', execution.signedRawTxHex);
 ```
 
 ---
 
-## 6. Directory Structure
+## 7. Directory Structure
 
 ```text
 agent-guard/
@@ -284,7 +437,7 @@ agent-guard/
 ├── contracts/                     # NEAR Rust Smart Contract (near-sdk v5.1.0)
 │   ├── Cargo.toml
 │   ├── out/
-│   │   └── agent_guard_contract.wasm  # Compiled 285KB WASM binary
+│   │   └── agent_guard_contract.wasm  # Compiled 226KB optimized WASM binary
 │   └── src/
 │       ├── lib.rs                 # Contract state, key scoping, Promise execution & callbacks
 │       ├── policy.rs              # Daily spending caps, per-tx limits, velocity check & rollback
@@ -292,14 +445,19 @@ agent-guard/
 ├── sdk/                           # AgentGuard AI Firewall & Enforcement SDK
 │   ├── package.json
 │   ├── src/
-│   │   ├── firewall.js            # Prompt injection & jailbreak analyzer
+│   │   ├── firewall.js            # Prompt injection & jailbreak analyzer (Claude Haiku 5.5 + Heuristics)
 │   │   ├── policy-engine.js       # Client-side validation mirror
-│   │   ├── intents-adapter.js     # NEAR Intents / Defuse slippage protector & solver RPC
-│   │   ├── outlayer-client.js     # OutLayer TEE enclave custody client
+│   │   ├── intents-adapter.js     # NEAR Intents cross-chain router (37 chains, 1Click Defuse)
+│   │   ├── outlayer-client.js     # OutLayer TEE Intel TDX enclave key custody client
+│   │   ├── passkey.js             # WebAuthn Biometric Passkey supervisor module (Touch ID / P-256)
+│   │   ├── middleware.js          # Drop-in ElizaOS plugin & LangChain tool wrapper
 │   │   └── index.js               # Unified AgentGuard SDK with near-api-js integration
 │   └── tests/
-│       ├── firewall.test.js       # Prompt injection test suite
-│       └── policy.test.js         # Spending limit & velocity tests
+│       ├── firewall.test.js       # Prompt injection test suite (Claude Haiku 5.5)
+│       ├── policy.test.js         # Spending limit & velocity tests
+│       ├── passkey.test.js        # Biometric Passkey signing & verification tests
+│       ├── outlayer-intents.test.js # OutLayer payment key & NEP-413 intent tests
+│       └── middleware-crosschain.test.js # ElizaOS, LangChain & Cross-chain tests
 ├── frontend/                      # Cyberpunk Security Cockpit (Vite + Vanilla CSS/JS)
 │   ├── index.html                 # Glassmorphic Operations Center & RPC sync
 │   ├── package.json

@@ -10,8 +10,12 @@
     "test:contracts": "cd contracts && cargo test",
     "build:contract": "./scripts/build.sh",
     "deploy": "node scripts/deploy.js",
+    "demo": "node scripts/demo.js",
     "dev": "npm --prefix frontend run dev",
-    "build": "npm --prefix frontend run build"
+    "build": "npm --prefix frontend run build",
+    "deploy:testnet": "node scripts/deploy-testnet.mjs",
+    "test:live": "node scripts/live-test.mjs",
+    "test:multisig": "cd contracts/multisig && cargo test"
   },
   "keywords": [
     "near",

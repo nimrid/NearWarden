@@ -1,0 +1,15 @@
+{
+  "display": {
+    "name": "AgentGuard Firewall Signer"
+  },
+  "operations": [
+    "public_key",
+    "sign_attestation"
+  ],
+  "capabilities": {
+    "network": []
+  },
+  "signing_keys": [
+    {"path": "firewall", "type": "ed25519"}
+  ]
+}
