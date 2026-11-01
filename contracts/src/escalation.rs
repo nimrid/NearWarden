@@ -73,18 +73,27 @@ impl EscalationQueue {
         self.actions.iter().find(|a| a.action_id == action_id)
     }
 
-    pub fn list_pending(&self, current_time_ns: u64) -> Vec<PendingAction> {
-        self.actions
-            .iter()
-            .map(|a| {
-                let mut action = a.clone();
-                if action.status == ActionStatus::Pending
-                    && current_time_ns > action.created_at_ns.saturating_add(ACTION_EXPIRY_NS)
-                {
-                    action.status = ActionStatus::Expired;
-                }
-                action
-            })
-            .collect()
+    pub fn list_pending(&mut self, current_time_ns: u64) -> Vec<PendingAction> {
+        // Persist expiry into the stored status so get_vault_status counts correctly
+        // and so approve_escalated cannot approve a truly-expired action.
+        for action in self.actions.iter_mut() {
+            if action.status == ActionStatus::Pending
+                && current_time_ns > action.created_at_ns.saturating_add(ACTION_EXPIRY_NS)
+            {
+                action.status = ActionStatus::Expired;
+            }
+        }
+        self.actions.clone()
+    }
+
+    /// Marks all expired pending actions as Expired in-place.
+    pub fn prune_expired(&mut self, current_time_ns: u64) {
+        for action in self.actions.iter_mut() {
+            if action.status == ActionStatus::Pending
+                && current_time_ns > action.created_at_ns.saturating_add(ACTION_EXPIRY_NS)
+            {
+                action.status = ActionStatus::Expired;
+            }
+        }
     }
 }

@@ -35,14 +35,14 @@ than a single signing operation.
 
 ## Publishing the TEE signer (OutLayer testnet dashboard)
 
-1. Open the OutLayer testnet dashboard and connect `blackquokka5481.testnet`.
+1. Open the OutLayer testnet dashboard and connect `longdata4360.testnet`.
 2. Create project `agentguard-firewall-signer` (id will be
-   `blackquokka5481.testnet/agentguard-firewall-signer`).
+   `longdata4360.testnet/agentguard-firewall-signer`).
 3. Publish [agentguard-firewall-signer.wasm](/Users/hng/agent-guard/enclave/firewall-signer/out/agentguard-firewall-signer.wasm)
    (sha256 `524e9694e8dd054bf9611d68d121e5c9f34eb4fdc33cf7c924b83c968fec57cf`)
    as a WasmUrl version and set it active. The signing key is bound to the
    project, so it survives later version upgrades.
-4. Fund the payment key (`blackquokka5481.testnet` nonce `1`) with at least
+4. Fund the payment key (`longdata4360.testnet` nonce `1`) with at least
    $1 of testnet stablecoin.
 5. Tell the operator "enclave live". Then: fetch the TEE public key with
    `OutLayerClient.anchorFirewallKeyInTee`, put it in

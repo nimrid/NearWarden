@@ -40,7 +40,7 @@ export class PolicyEngine {
    * @returns {Object} { allowed: boolean, statusCode: number, reason: string, requiresEscalation: boolean }
    */
   evaluate({ target, method, amount = '0', timestamp = Date.now() }) {
-    const amountBn = BigInt(amount || 0);
+    const amountBn = BigInt(amount ?? 0);
 
     // 1. Emergency Freeze check
     if (this.emergencyFrozen) {

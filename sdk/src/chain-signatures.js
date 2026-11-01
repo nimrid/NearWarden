@@ -399,9 +399,46 @@ export class ChainSignatures {
       ? await this.account.callFunction(callArgs)
       : await this.account.functionCall(callArgs);
 
+    // Extract the MPC signature coordinates from the receipt's SuccessValue.
+    // v1.signer returns { big_r: { affine_point: "03..." }, s: { scalar: "..." }, recovery_id: 0|1 }
+    let mpcSignature = null;
+    try {
+      const receipts = outcome?.receipts_outcome || [];
+      for (const receipt of receipts) {
+        const sv = receipt?.outcome?.status?.SuccessValue;
+        if (sv) {
+          const decoded = JSON.parse(Buffer.from(sv, 'base64').toString('utf8'));
+          if (decoded && (decoded.big_r || decoded.Big_r)) {
+            mpcSignature = {
+              big_r: decoded.big_r || decoded.Big_r,
+              s: decoded.s || decoded.S,
+              recovery_id: decoded.recovery_id ?? decoded.recoveryId ?? 0,
+            };
+            break;
+          }
+        }
+      }
+      // Also check the top-level status SuccessValue (some RPC versions surface it there)
+      if (!mpcSignature) {
+        const topSv = outcome?.status?.SuccessValue;
+        if (topSv) {
+          const decoded = JSON.parse(Buffer.from(topSv, 'base64').toString('utf8'));
+          if (decoded && (decoded.big_r || decoded.Big_r)) {
+            mpcSignature = {
+              big_r: decoded.big_r || decoded.Big_r,
+              s: decoded.s || decoded.S,
+              recovery_id: decoded.recovery_id ?? decoded.recoveryId ?? 0,
+            };
+          }
+        }
+      }
+    } catch (_) {}
+
     return {
       success: true,
       transactionHash: outcome?.transaction?.hash || outcome?.transaction_outcome?.id,
+      // Surface MPC signature fields at the top level for downstream assembly
+      ...(mpcSignature || {}),
       outcome,
     };
   }

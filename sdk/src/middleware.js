@@ -84,13 +84,15 @@ export function createElizaPlugin(agentGuard) {
         name: 'CHECK_VAULT_LIMITS',
         description: 'Checks remaining daily spending quota and per-transaction limits on NEAR',
         handler: async (runtime, message) => {
-          const quota = agentGuard.policyEngine.getRemainingDailyQuota();
-          const cap = agentGuard.policyEngine.perTxCap;
-          const isFrozen = agentGuard.policyEngine.emergencyFrozen;
+          const status = agentGuard.policyEngine.getStatus();
           return {
-            isFrozen,
-            remainingDailyQuota: quota.toString(),
-            perTransactionCap: cap.toString(),
+            isFrozen: status.isFrozen,
+            remainingDailyQuota: status.remainingQuota,
+            dailySpent: status.dailySpent,
+            dailySpendingCap: status.dailySpendingCap,
+            perTransactionCap: status.perTxCap,
+            recentCallCount: status.recentCallCount,
+            maxVelocityPerHour: status.maxVelocityPerHour,
           };
         },
       },
@@ -147,7 +149,7 @@ export function wrapLangChainTool(tool, agentGuard) {
       result: toolResult,
       agentGuardTrace: {
         threatScore: auditResult.threatScore,
-        evaluator: 'CLAUDE_AI_GUARD',
+        evaluator: auditResult.evaluator || 'HEURISTIC_GUARD',
         policyCompliant: true,
       },
     };

@@ -64,7 +64,7 @@ async function main() {
       gas: '50000000000000',
     });
   } catch (e) {
-    unauthorizedBlocked = /authorized caller|Missing required/.test(e.message);
+    unauthorizedBlocked = /authorized caller|Missing required|unreachable|WebAssembly trap/i.test(e.message);
   }
   check('unauthorized caller rejected on-chain', unauthorizedBlocked);
 

@@ -23,7 +23,7 @@ test('Cross-Chain - Validates addresses across Solana, Base, Ethereum, and Bitco
   assert.equal(adapter.validateRecipientAddress('solana', '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU').valid, true);
   assert.equal(adapter.validateRecipientAddress('base', '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913').valid, true);
   assert.equal(adapter.validateRecipientAddress('ethereum', '0xdAC17F958D2ee523a2206206994597C13D831ec7').valid, true);
-  assert.equal(adapter.validateRecipientAddress('near', 'blackquokka5481.testnet').valid, true);
+  assert.equal(adapter.validateRecipientAddress('near', 'longdata4360.testnet').valid, true);
   assert.equal(adapter.validateRecipientAddress('bitcoin', 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq').valid, true);
 
   // Invalid addresses

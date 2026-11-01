@@ -1,18 +1,19 @@
 {
   "network": "testnet",
   "rpcUrl": "https://rpc.testnet.near.org",
-  "deployerAccount": "blackquokka5481.testnet",
-  "vaultAccount": "blackquokka5481.testnet",
-  "multisigAccount": "guard.blackquokka5481.testnet",
+  "deployerAccount": "longdata4360.testnet",
+  "vaultAccount": "longdata4360.testnet",
+  "multisigAccount": "guard.longdata4360.testnet",
   "multisigThreshold": 2,
   "memberAccounts": [
-    "blackquokka5481.testnet",
-    "m1.blackquokka5481.testnet",
-    "m2.blackquokka5481.testnet"
+    "longdata4360.testnet",
+    "m1.longdata4360.testnet",
+    "m2.longdata4360.testnet"
   ],
-  "agentAccount": "agent.blackquokka5481.testnet",
-  "outlayerSignerProject": "blackquokka5481.testnet/agentguard-firewall-signer",
-  "firewallPublicKey": null,
+  "agentAccount": "agent.longdata4360.testnet",
+  "outlayerSignerProject": "longdata4360.testnet/agentguard-firewall-signer",
+  "firewallPublicKey": "ed25519:TYyTf51QAY7P6p35vRTEU3GungTDsHeKdKM2R2DrbF9",
+  "supervisorPasskeyPublicKey": null,
   "keychainSecrets": {
     "deployer": "deployer-private-key",
     "member1": "member1-private-key",

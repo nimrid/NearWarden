@@ -110,6 +110,12 @@ function foldHomoglyphs(str) {
 }
 
 function foldLeetspeak(str) {
+  // Skip leet-fold for strings that are predominantly numeric (>60% digits)
+  // to avoid false positives on yoctoNEAR amounts like '1000000000000000000000000'.
+  const digitCount = (str.match(/\d/g) || []).length;
+  if (str.length > 0 && digitCount / str.length > 0.6) {
+    return str;
+  }
   let out = '';
   for (const ch of str) {
     out += LEETSPEAK_MAP[ch] || ch;
@@ -427,6 +433,9 @@ AMOUNT: "${amount}"`,
             model: selectedModel,
           };
         }
+      } else {
+        // Surface non-OK responses so misconfigured/rate-limited keys are visible
+        console.warn(`[AgentFirewall] Claude API returned HTTP ${response.status}; falling back to heuristic scanner`);
       }
     } catch (err) {
       // Graceful fallback to heuristic result if Claude API request fails or times out

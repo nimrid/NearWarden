@@ -15,6 +15,9 @@ pub const GAS_FOR_CALLBACK: Gas = Gas::from_tgas(10);
 pub const GAS_FOR_MPC_SIGN: Gas = Gas::from_tgas(250);
 pub const GAS_FOR_MPC_CALLBACK: Gas = Gas::from_tgas(30);
 pub const ATTACHED_DEPOSIT_FOR_MPC: NearToken = NearToken::from_yoctonear(50_000_000_000_000_000_000_000); // 0.05 NEAR
+/// Maximum number of audit log entries retained on-chain.
+/// When exceeded, the oldest entry is evicted (ring-buffer behaviour).
+pub const MAX_AUDIT_ENTRIES: usize = 1_000;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(crate = "near_sdk::serde")]
@@ -277,7 +280,7 @@ impl AgentGuardContract {
                     status: "APPROVED_AND_EXECUTED".to_string(),
                     threat_score: verified_threat_score,
                 };
-                self.audit_log.push(entry);
+                self.push_audit(entry);
 
                 // Dispatch on-chain cross-contract call with callback
                 let promise = Promise::new(target.clone())
@@ -314,7 +317,7 @@ impl AgentGuardContract {
                     status: format!("ESCALATED_ACTION_{}", action_id),
                     threat_score: 65,
                 };
-                self.audit_log.push(entry);
+                self.push_audit(entry);
 
                 PromiseOrValue::Value(ExecutionResult {
                     success: false,
@@ -362,7 +365,7 @@ impl AgentGuardContract {
                     status: format!("BLOCKED: {}", error_msg),
                     threat_score,
                 };
-                self.audit_log.push(entry);
+                self.push_audit(entry);
 
                 PromiseOrValue::Value(ExecutionResult {
                     success: false,
@@ -389,7 +392,7 @@ impl AgentGuardContract {
         if !success {
             self.tracker.rollback_spend(amount.0);
 
-            self.audit_log.push(AuditEntry {
+            self.push_audit(AuditEntry {
                 timestamp_ns: env::block_timestamp(),
                 caller,
                 target: target.clone(),
@@ -469,7 +472,7 @@ impl AgentGuardContract {
                     status: "CHAIN_SIGNATURE_REQUESTED".to_string(),
                     threat_score: verified_threat_score,
                 };
-                self.audit_log.push(entry);
+                self.push_audit(entry);
 
                 let sign_args = SignRequestArgs {
                     request: SignRequestPayload {
@@ -513,7 +516,7 @@ impl AgentGuardContract {
                     status: format!("ESCALATED_ACTION_{}", action_id),
                     threat_score: 65,
                 };
-                self.audit_log.push(entry);
+                self.push_audit(entry);
 
                 PromiseOrValue::Value(ExecutionResult {
                     success: false,
@@ -555,7 +558,7 @@ impl AgentGuardContract {
                     status: format!("BLOCKED: {}", error_msg),
                     threat_score,
                 };
-                self.audit_log.push(entry);
+                self.push_audit(entry);
 
                 PromiseOrValue::Value(ExecutionResult {
                     success: false,
@@ -583,7 +586,7 @@ impl AgentGuardContract {
         if !success {
             self.tracker.rollback_spend(amount.0);
 
-            self.audit_log.push(AuditEntry {
+            self.push_audit(AuditEntry {
                 timestamp_ns: env::block_timestamp(),
                 caller,
                 target: mpc_contract,
@@ -601,7 +604,7 @@ impl AgentGuardContract {
                 threat_score: 30,
             }
         } else {
-            self.audit_log.push(AuditEntry {
+            self.push_audit(AuditEntry {
                 timestamp_ns: env::block_timestamp(),
                 caller,
                 target: mpc_contract,
@@ -625,7 +628,7 @@ impl AgentGuardContract {
         self.assert_owner();
         self.policy.emergency_frozen = true;
 
-        self.audit_log.push(AuditEntry {
+        self.push_audit(AuditEntry {
             timestamp_ns: env::block_timestamp(),
             caller: env::predecessor_account_id(),
             target: env::current_account_id(),
@@ -641,7 +644,7 @@ impl AgentGuardContract {
         self.assert_owner();
         self.policy.emergency_frozen = false;
 
-        self.audit_log.push(AuditEntry {
+        self.push_audit(AuditEntry {
             timestamp_ns: env::block_timestamp(),
             caller: env::predecessor_account_id(),
             target: env::current_account_id(),
@@ -657,6 +660,11 @@ impl AgentGuardContract {
     pub fn approve_escalated(&mut self, action_id: u64, passkey_signature: Option<String>) -> PromiseOrValue<bool> {
         self.assert_owner();
         let current_time = env::block_timestamp();
+
+        // Persist expiry before reading action status so expired actions
+        // fail the Pending check below rather than slipping through.
+        self.escalation.prune_expired(current_time);
+
         let (target0, method0, args0, deposit0, created_at_ns) = {
             let action = self.escalation.get_action(action_id).expect("Action not found");
             require!(action.status == ActionStatus::Pending, "Action is not pending");
@@ -732,7 +740,7 @@ impl AgentGuardContract {
             format!("MANUALLY_APPROVED_AND_DISPATCHED_ACTION_{}", action_id)
         };
 
-        self.audit_log.push(AuditEntry {
+        self.push_audit(AuditEntry {
             timestamp_ns: env::block_timestamp(),
             caller: env::predecessor_account_id(),
             target: target.clone(),
@@ -782,17 +790,21 @@ impl AgentGuardContract {
     /// Reject an escalated transaction
     pub fn reject_escalated(&mut self, action_id: u64) -> bool {
         self.assert_owner();
-        let action = self.escalation.get_action_mut(action_id).expect("Action not found");
-        require!(action.status == ActionStatus::Pending, "Action is not pending");
+        // Extract fields before mutating status to avoid double-borrow
+        let (target, method, deposit) = {
+            let action = self.escalation.get_action(action_id).expect("Action not found");
+            require!(action.status == ActionStatus::Pending, "Action is not pending");
+            (action.target.clone(), action.method.clone(), action.deposit)
+        };
+        // Now it's safe to mutate
+        self.escalation.get_action_mut(action_id).unwrap().status = ActionStatus::Rejected;
 
-        action.status = ActionStatus::Rejected;
-
-        self.audit_log.push(AuditEntry {
+        self.push_audit(AuditEntry {
             timestamp_ns: env::block_timestamp(),
             caller: env::predecessor_account_id(),
-            target: action.target.clone(),
-            method: action.method.clone(),
-            amount: U128(action.deposit),
+            target,
+            method,
+            amount: U128(deposit),
             status: format!("MANUALLY_REJECTED_ACTION_{}", action_id),
             threat_score: 30,
         });
@@ -825,7 +837,7 @@ impl AgentGuardContract {
         );
         self.policy.firewall_public_key = public_key;
 
-        self.audit_log.push(AuditEntry {
+        self.push_audit(AuditEntry {
             timestamp_ns: env::block_timestamp(),
             caller: env::predecessor_account_id(),
             target: env::current_account_id(),
@@ -849,7 +861,7 @@ impl AgentGuardContract {
         }
         self.policy.supervisor_passkey_public_key = public_key_hex;
 
-        self.audit_log.push(AuditEntry {
+        self.push_audit(AuditEntry {
             timestamp_ns: env::block_timestamp(),
             caller: env::predecessor_account_id(),
             target: env::current_account_id(),
@@ -866,7 +878,7 @@ impl AgentGuardContract {
         let hash_display = passkey_hash.clone().unwrap_or_else(|| "NONE".to_string());
         self.policy.supervisor_passkey_hash = passkey_hash;
 
-        self.audit_log.push(AuditEntry {
+        self.push_audit(AuditEntry {
             timestamp_ns: env::block_timestamp(),
             caller: env::predecessor_account_id(),
             target: env::current_account_id(),
@@ -879,10 +891,11 @@ impl AgentGuardContract {
 
     // --- VIEW METHODS ---
 
-    pub fn get_vault_status(&self) -> VaultStatusView {
+    pub fn get_vault_status(&mut self) -> VaultStatusView {
         let current_time = env::block_timestamp();
         let remaining_quota = self.policy.daily_spending_cap.saturating_sub(self.tracker.current_day_spent);
-        let pending = self.escalation.list_pending(current_time);
+        // list_pending persists Expired status in-place for accurate counts
+        let all_actions = self.escalation.list_pending(current_time);
 
         VaultStatusView {
             owner_id: self.owner_id.clone(),
@@ -891,7 +904,7 @@ impl AgentGuardContract {
             daily_spent: U128(self.tracker.current_day_spent),
             remaining_daily_quota: U128(remaining_quota),
             per_tx_cap: U128(self.policy.per_tx_cap),
-            total_pending_actions: pending.iter().filter(|a| a.status == ActionStatus::Pending).count(),
+            total_pending_actions: all_actions.iter().filter(|a| a.status == ActionStatus::Pending).count(),
             audit_log_count: self.audit_log.len(),
         }
     }
@@ -900,7 +913,7 @@ impl AgentGuardContract {
         self.policy.clone()
     }
 
-    pub fn get_pending_actions(&self) -> Vec<PendingAction> {
+    pub fn get_pending_actions(&mut self) -> Vec<PendingAction> {
         self.escalation.list_pending(env::block_timestamp())
     }
 
@@ -919,6 +932,14 @@ impl AgentGuardContract {
             env::predecessor_account_id() == self.owner_id,
             "Only contract owner can invoke this method"
         );
+    }
+
+    /// Appends an audit entry, evicting the oldest when the log reaches MAX_AUDIT_ENTRIES.
+    fn push_audit(&mut self, entry: AuditEntry) {
+        if self.audit_log.len() >= MAX_AUDIT_ENTRIES {
+            self.audit_log.remove(0);
+        }
+        self.audit_log.push(entry);
     }
 }
 
@@ -1016,12 +1037,26 @@ mod tests {
         let context = get_context("alice.near".parse().unwrap(), true);
         testing_env!(context.build());
 
-        let contract = test_contract();
+        let mut contract = test_contract();
         let status = contract.get_vault_status();
 
         assert_eq!(status.owner_id, "alice.near".parse::<AccountId>().unwrap());
         assert!(!status.is_frozen);
         assert_eq!(status.daily_spent.0, 0);
+    }
+
+    #[test]
+    fn test_serde_policy() {
+        #[allow(dead_code)]
+        #[derive(near_sdk::serde::Deserialize, Debug)]
+        #[serde(crate = "near_sdk::serde")]
+        struct NewArgs {
+            owner_id: AccountId,
+            policy: Option<PolicyConfig>,
+        }
+        let json_num = r#"{"owner_id":"guard.longdata4360.testnet","policy":{"daily_spending_cap":10000000000000000000000000,"per_tx_cap":2000000000000000000000000,"allowed_targets":["wrap.testnet","intents.testnet","v1.signer-prod.testnet"],"allowed_methods":["ft_transfer","ft_transfer_call","execute_intent","storage_deposit","near_deposit","sign"],"max_velocity_per_hour":20,"emergency_frozen":false,"firewall_public_key":"ed25519:TYyTf51QAY7P6p35vRTEU3GungTDsHeKdKM2R2DrbF9","max_attestation_age_ms":300000,"max_threat_score":75,"supervisor_passkey_hash":null,"mpc_contract_id":"v1.signer-prod.testnet","authorized_callers":["agent.longdata4360.testnet"],"supervisor_passkey_public_key":null}}"#;
+        let res_num: Result<NewArgs, _> = near_sdk::serde_json::from_str(json_num);
+        assert!(res_num.is_ok(), "NewArgs failed: {:?}", res_num.err());
     }
 
     #[test]
@@ -1570,13 +1605,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "AgentGuard: Escalated action expired")]
+    #[should_panic(expected = "Action is not pending")]
     fn test_escalated_approval_rejected_after_expiry() {
         let context = get_context("agent.near".parse().unwrap(), false);
         testing_env!(context.build());
         let mut contract = test_contract();
         let action_id = escalate_five_near(&mut contract);
         let mut owner_context = get_context("alice.near".parse().unwrap(), false);
+        // Advance time by 25 hours (> ACTION_EXPIRY_NS = 24 hours)
         owner_context.block_timestamp(1_700_000_000_000_000_000 + 90_000_000_000_000);
         testing_env!(owner_context.build());
         let _ = contract.approve_escalated(action_id, None);

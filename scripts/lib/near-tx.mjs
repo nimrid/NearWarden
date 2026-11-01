@@ -68,6 +68,7 @@ export const act = {
   addFunctionCallKey: (publicKeyStr, contractId, methodNames, allowance) =>
     actions.addFunctionCallAccessKey(PublicKey.fromString(publicKeyStr), contractId, methodNames, BigInt(allowance)),
   deleteKey: (publicKeyStr) => actions.deleteKey(PublicKey.fromString(publicKeyStr)),
+  deleteAccount: (beneficiaryId) => actions.deleteAccount(beneficiaryId),
 };
 
 export function generateKeyPair() {

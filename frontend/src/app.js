@@ -461,7 +461,7 @@ function renderWafTable() {
               <div class="trace-pipeline-box">
                 <div class="trace-title">
                   <span>EXECUTION TRACE PIPELINE</span>
-                  <a href="https://testnet.nearblocks.io/address/blackquokka5481.testnet" target="_blank" class="footer-link">View in NEARBlocks ↗</a>
+                  <a href="https://testnet.nearblocks.io/address/longdata4360.testnet" target="_blank" class="footer-link">View in NEARBlocks ↗</a>
                 </div>
                 <div class="pipeline-nodes">
                   <div class="p-node ${trace.step1?.status || 'passed'}">
@@ -1426,7 +1426,7 @@ async function queryNearRpc(contractId, methodName, argsObj = {}) {
 }
 
 async function syncOnChainState() {
-  const contractId = elInputContractId?.value.trim() || 'blackquokka5481.testnet';
+  const contractId = elInputContractId?.value.trim() || 'longdata4360.testnet';
   if (elRpcStatusText) elRpcStatusText.textContent = `Querying ${contractId}...`;
 
   try {

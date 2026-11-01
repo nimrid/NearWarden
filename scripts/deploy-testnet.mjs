@@ -153,7 +153,10 @@ async function phaseInit() {
     actions: [
       act.functionCall(
         'new',
-        JSON.stringify({ owner_id: config.multisigAccount, policy }),
+        JSON.stringify({ owner_id: config.multisigAccount, policy }).replace(
+          /"(daily_spending_cap|per_tx_cap)":"(\d+)"/g,
+          '"$1":$2'
+        ),
         '30000000000000',
         '0'
       ),

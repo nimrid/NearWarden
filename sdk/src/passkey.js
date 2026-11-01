@@ -133,13 +133,22 @@ export async function signEscalationWithPasskey({
   const challengeRaw = method
     ? `AgentGuard:ApproveAction:${actionId}:${targetContract}:${method}:${argsStr}:${amount}`
     : `AgentGuard:ApproveAction:${actionId}:${targetContract}:${amount}:${timestamp}`;
+
+  // The on-chain contract computes sha256(sha256(canonical)) before verifying.
+  // We pre-compute sha256(canonical) here; the authenticator/createSign then
+  // applies a second sha256, producing the expected double-hash on both paths.
   const challengeHash = crypto.createHash('sha256').update(challengeRaw).digest();
+  // Double-hash: sha256(sha256(canonical)) — must match contract verify_supervisor_passkey
+  const challengeDoubleHash = crypto.createHash('sha256').update(challengeHash).digest();
 
   // Browser WebAuthn Touch ID / Face ID ceremony
   if (typeof window !== 'undefined' && window.navigator?.credentials?.get) {
     const getOptions = {
       publicKey: {
-        challenge: challengeHash,
+        // Pass the double-hash directly as the WebAuthn challenge.
+        // The authenticator signs the challenge bytes as-is (no extra hashing),
+        // matching the sha256(sha256(canonical)) the contract verifies.
+        challenge: challengeDoubleHash,
         rpId,
         allowCredentials: credentialId ? [{
           id: base64UrlToBuffer(credentialId),
@@ -163,12 +172,16 @@ export async function signEscalationWithPasskey({
       clientDataJSON,
       authenticatorData: authDataHex,
       challengeText: challengeRaw,
+      challengeHash: challengeDoubleHash.toString('hex'),
       biometricVerified: true,
       authMethod: 'TOUCH_ID_OR_FACE_ID',
     };
   }
 
-  // Node.js environment: sign with the P-256 private key
+  // Node.js environment: sign with the P-256 private key.
+  // createSign('SHA256') applies sha256 internally over the data passed to .update().
+  // We pass challengeHash (= sha256(canonical)), so the final signed digest is
+  // sha256(sha256(canonical)), matching the contract's double-hash verification.
   if (!privateKey) {
     throw new Error('privateKey required in headless environment');
   }
@@ -184,7 +197,7 @@ export async function signEscalationWithPasskey({
     credentialId,
     signature,
     challengeText: challengeRaw,
-    challengeHash: challengeHash.toString('hex'),
+    challengeHash: challengeDoubleHash.toString('hex'),
     biometricVerified: true,
     authMethod: 'SECURE_ENCLAVE_P256',
   };

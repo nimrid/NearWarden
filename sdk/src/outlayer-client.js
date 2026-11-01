@@ -51,7 +51,7 @@ export class OutLayerClient {
     }
 
     const url = `${this.baseUrl}/public/payment-keys/${this.paymentOwner}/${this.paymentNonce}/balance`;
-    const response = await fetch(url);
+    const response = await this._fetch(url);
     if (!response.ok) {
       const errText = await response.text();
       throw new Error(`Failed to query payment key balance (${response.status}): ${errText}`);
@@ -64,7 +64,7 @@ export class OutLayerClient {
    */
   async registerWallet() {
     try {
-      const response = await fetch(`${this.baseUrl}/register`, {
+      const response = await this._fetch(`${this.baseUrl}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -117,7 +117,7 @@ export class OutLayerClient {
   async getWalletAddress(chain = 'near') {
     await this.ensureSession();
 
-    const response = await fetch(`${this.baseUrl}/wallet/v1/address?chain=${chain}`, {
+    const response = await this._fetch(`${this.baseUrl}/wallet/v1/address?chain=${chain}`, {
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
       },
@@ -135,7 +135,7 @@ export class OutLayerClient {
   async getTokens() {
     await this.ensureSession();
 
-    const response = await fetch(`${this.baseUrl}/wallet/v1/tokens`, {
+    const response = await this._fetch(`${this.baseUrl}/wallet/v1/tokens`, {
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
       },
@@ -153,7 +153,7 @@ export class OutLayerClient {
   async getSwapQuote({ tokenIn, tokenOut, amountIn, minAmountOut }) {
     await this.ensureSession();
 
-    const response = await fetch(`${this.baseUrl}/wallet/v1/intents/swap/quote`, {
+    const response = await this._fetch(`${this.baseUrl}/wallet/v1/intents/swap/quote`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -179,7 +179,7 @@ export class OutLayerClient {
   async getPolicy() {
     await this.ensureSession();
 
-    const response = await fetch(`${this.baseUrl}/wallet/v1/policy`, {
+    const response = await this._fetch(`${this.baseUrl}/wallet/v1/policy`, {
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
       },
@@ -211,10 +211,15 @@ export class OutLayerClient {
       if (this.paymentOwner && this.paymentNonce) {
         report.paymentKeyBalance = await this.getPaymentKeyBalance();
       }
-      const reg = await this.registerWallet();
-      if (reg && reg.success) {
+      // Only register a new wallet if no active session exists
+      if (!this.apiKey) {
+        const reg = await this.registerWallet();
+        if (reg && reg.success) {
+          report.walletId = reg.walletId;
+        }
+      }
+      if (this.apiKey) {
         report.teeSessionActive = true;
-        report.walletId = reg.walletId;
         const addr = await this.getWalletAddress('near');
         report.walletAddress = addr.address;
         const tokensData = await this.getTokens();
@@ -238,7 +243,7 @@ export class OutLayerClient {
     }
 
     const url = `${this.baseUrl}/call/${projectOwner}/${projectName}`;
-    const response = await fetch(url, {
+    const response = await this._fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -293,7 +298,9 @@ export class OutLayerClient {
     if (!this.paymentKey) {
       throw new Error('OutLayer payment key not configured: inject OUTLAYER_API_KEY from your secrets manager.');
     }
-    const [owner, project] = this.signerProject.split('/');
+    const parts = this.signerProject.split('/');
+    const owner = parts[0];
+    const project = parts.slice(1).join('/');  // allow project names with slashes
     if (!owner || !project) {
       throw new Error(`Invalid OUTLAYER_SIGNER_PROJECT "${this.signerProject}"; expected "<owner>/<project>"`);
     }

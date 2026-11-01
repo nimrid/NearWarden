@@ -38,6 +38,9 @@ export class NearIntentsAdapter {
     this.defaultMaxSlippagePercent = options.maxSlippagePercent || 1.5;
     this.solverRelayWsUrl = options.solverRelayWsUrl || 'wss://solver-relay-v2.chaindefuser.com/ws';
     this.oneClickApiUrl = options.oneClickApiUrl || 'https://1click.chaindefuser.com/v0';
+    // The NEAR account ID that will sign/send intent transactions.
+    // Override per-call or set once at construction.
+    this.signerAccountId = options.signerAccountId || options.accountId || 'agent.near';
   }
 
   /**
@@ -86,6 +89,7 @@ export class NearIntentsAdapter {
     expectedAmountOut,
     maxSlippagePercent,
     deadlineMinutes = 5,
+    signerId,
   }) {
     const slippage = maxSlippagePercent ?? this.defaultMaxSlippagePercent;
     if (slippage > 5.0) {
@@ -96,11 +100,12 @@ export class NearIntentsAdapter {
     const slippageBps = BigInt(Math.floor(slippage * 100));
     const minAmountOut = (expectedOutBn * (10000n - slippageBps)) / 10000n;
     const deadlineTimestamp = Date.now() + deadlineMinutes * 60 * 1000;
+    const resolvedSignerId = signerId || this.signerAccountId;
 
     const intentPayload = {
       standard: 'nep413',
       message: {
-        signer_id: 'agent.near',
+        signer_id: resolvedSignerId,
         verifying_contract: this.verifierContract,
         deadline: new Date(deadlineTimestamp).toISOString(),
         intents: [

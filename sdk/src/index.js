@@ -191,7 +191,7 @@ export class AgentGuard {
    */
   initNearProvider() {
     if (!this.provider) {
-      this.provider = new nearAPI.JsonRpcProvider({ url: this.nodeUrl });
+      this.provider = new nearAPI.providers.JsonRpcProvider({ url: this.nodeUrl });
     }
     return this.provider;
   }

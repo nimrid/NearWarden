@@ -32,9 +32,9 @@
       </nav>
 
       <!-- Clickable NEARBlocks Testnet Explorer Link -->
-      <a href="https://testnet.nearblocks.io/address/blackquokka5481.testnet" target="_blank" rel="noopener noreferrer" class="contract-chip-link" title="Open Contract in NEARBlocks Explorer">
+      <a href="https://testnet.nearblocks.io/address/longdata4360.testnet" target="_blank" rel="noopener noreferrer" class="contract-chip-link" title="Open Contract in NEARBlocks Explorer">
         <span class="indicator-dot active" id="vault-status-dot"></span>
-        <span class="contract-id" id="display-contract-id">blackquokka5481.testnet</span>
+        <span class="contract-id" id="display-contract-id">longdata4360.testnet</span>
         <span class="external-icon">↗</span>
       </a>
     </div>
@@ -239,7 +239,7 @@
             <h4>NEAR Policy Vault</h4>
             <span class="flow-env">Rust Smart Contract</span>
           </div>
-          <p>Deployed on NEAR (<code>blackquokka5481.testnet</code>). The agent holds only a Scoped Function Call Key. The contract enforces rolling 24-hour spending quotas and per-tx autonomous caps on-chain.</p>
+          <p>Deployed on NEAR (<code>longdata4360.testnet</code>). The agent holds only a Scoped Function Call Key. The contract enforces rolling 24-hour spending quotas and per-tx autonomous caps on-chain.</p>
           <ul class="arch-points">
             <li>Zero Full Access Keys provisioned to models</li>
             <li>Transactions &gt; 2.0 NEAR pause into Multi-Sig Queue</li>
@@ -285,7 +285,7 @@
 
 <span class="t-muted">// 1. Initialize firewall with spending policy</span>
 <span class="t-var">const</span> <span class="t-prop">firewall</span> = <span class="t-var">new</span> <span class="t-fn">AgentGuardFirewall</span>({
-  vaultContractId: <span class="t-str">'blackquokka5481.testnet'</span>,
+  vaultContractId: <span class="t-str">'longdata4360.testnet'</span>,
   dailyBudgetNear: <span class="t-num">10.0</span>,
   perTxLimitNear: <span class="t-num">2.0</span>,
   allowedContracts: [<span class="t-str">'intents.near'</span>, <span class="t-str">'wrap.near'</span>]
@@ -312,7 +312,7 @@
   name: <span class="t-str">'TraderBot'</span>,
   plugins: [
     <span class="t-fn">agentGuardPlugin</span>({
-      vaultAccount: <span class="t-str">'blackquokka5481.testnet'</span>,
+      vaultAccount: <span class="t-str">'longdata4360.testnet'</span>,
       spendingQuota: <span class="t-str">'10.0'</span>,
       escalateAbove: <span class="t-str">'2.0'</span>
     })
@@ -324,7 +324,7 @@
           <pre><code><span class="t-var">from</span> agent_guard <span class="t-var">import</span> NearFirewall
 
 <span class="t-muted"># In NEAR.AI agent loop</span>
-firewall = NearFirewall(vault=<span class="t-str">"blackquokka5481.testnet"</span>, max_pertx=<span class="t-num">2.0</span>)
+firewall = NearFirewall(vault=<span class="t-str">"longdata4360.testnet"</span>, max_pertx=<span class="t-num">2.0</span>)
 
 @agent.tool
 <span class="t-var">def</span> <span class="t-fn">execute_trade</span>(prompt, amount, target):
@@ -672,7 +672,7 @@ firewall = NearFirewall(vault=<span class="t-str">"blackquokka5481.testnet"</spa
 
         <div class="callout-box">
           <div class="callout-title">Architectural Security Guarantee</div>
-          <p>Standard NEAR accounts grant Full Access Keys (FAKs), allowing an LLM to delete accounts or transfer 100% of tokens. In AgentGuard, agents are provisioned solely with <strong>Function Call Keys (FCKs)</strong> restricted to the method <code>execute_intent</code> on <code>blackquokka5481.testnet</code>. Even in a 100% prompt-compromised state, the agent cannot execute arbitrary transactions.</p>
+          <p>Standard NEAR accounts grant Full Access Keys (FAKs), allowing an LLM to delete accounts or transfer 100% of tokens. In AgentGuard, agents are provisioned solely with <strong>Function Call Keys (FCKs)</strong> restricted to the method <code>execute_intent</code> on <code>longdata4360.testnet</code>. Even in a 100% prompt-compromised state, the agent cannot execute arbitrary transactions.</p>
         </div>
 
         <div class="table-container">
@@ -693,7 +693,7 @@ firewall = NearFirewall(vault=<span class="t-str">"blackquokka5481.testnet"</spa
                 <td><code>ed25519:8mNwK9x4...7xQz3</code></td>
                 <td><code>agent_trader_01.near</code></td>
                 <td><span class="status-badge badge-neutral">FunctionCall</span></td>
-                <td><code>blackquokka5481.testnet</code></td>
+                <td><code>longdata4360.testnet</code></td>
                 <td><code>execute_intent</code></td>
                 <td>0.25 NEAR</td>
                 <td><span class="status-badge badge-success">ACTIVE</span></td>
@@ -702,7 +702,7 @@ firewall = NearFirewall(vault=<span class="t-str">"blackquokka5481.testnet"</spa
                 <td><code>ed25519:4kPzL2m8...3yRm9</code></td>
                 <td><code>eliza_arbitrage_bot.near</code></td>
                 <td><span class="status-badge badge-neutral">FunctionCall</span></td>
-                <td><code>blackquokka5481.testnet</code></td>
+                <td><code>longdata4360.testnet</code></td>
                 <td><code>execute_intent</code></td>
                 <td>0.25 NEAR</td>
                 <td><span class="status-badge badge-success">ACTIVE</span></td>
@@ -711,7 +711,7 @@ firewall = NearFirewall(vault=<span class="t-str">"blackquokka5481.testnet"</spa
                 <td><code>ed25519:9vBtY6c1...5wKl2</code></td>
                 <td><code>procurement_swarm_agent.near</code></td>
                 <td><span class="status-badge badge-neutral">FunctionCall</span></td>
-                <td><code>blackquokka5481.testnet</code></td>
+                <td><code>longdata4360.testnet</code></td>
                 <td><code>execute_intent</code></td>
                 <td>0.25 NEAR</td>
                 <td><span class="status-badge badge-success">ACTIVE</span></td>
@@ -871,7 +871,7 @@ firewall = NearFirewall(vault=<span class="t-str">"blackquokka5481.testnet"</spa
             <pre><code id="code-snippet-sdk">import { AgentGuardFirewall, IntentsAdapter } from 'agent-guard';
 
 const firewall = new AgentGuardFirewall({
-  vaultContractId: 'blackquokka5481.testnet',
+  vaultContractId: 'longdata4360.testnet',
   dailyBudgetNear: 10.0,
   perTxLimitNear: 2.0,
   allowedContracts: ['intents.near', 'wrap.near']
@@ -894,7 +894,7 @@ const intent = await firewall.inspectAndDispatch({
     <div class="footer-left">
       <span>AgentGuard v1.0.0</span>
       <span class="footer-divider">•</span>
-      <span>Contract: <a href="https://testnet.nearblocks.io/address/blackquokka5481.testnet" target="_blank" class="footer-link"><code>blackquokka5481.testnet ↗</code></a></span>
+      <span>Contract: <a href="https://testnet.nearblocks.io/address/longdata4360.testnet" target="_blank" class="footer-link"><code>longdata4360.testnet ↗</code></a></span>
       <span class="footer-divider">•</span>
       <span>Tracks: <code>security</code>, <code>agents</code></span>
     </div>

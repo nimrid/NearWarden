@@ -11,7 +11,20 @@
  * 6. Biometric Passkey Signing & Multi-Sig Approval
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { AgentGuard } from '../sdk/src/index.js';
+import { getSecret } from './lib/keychain.mjs';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+let config = {};
+try {
+  config = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../config/testnet.json'), 'utf8'));
+} catch {}
+
+const outlayerPaymentKey = getSecret(config.keychainSecrets?.outlayer || 'outlayer-api-key');
+const signerProject = config.outlayerSignerProject || 'longdata4360.testnet/agentguard-firewall-signer';
 
 async function main() {
   const cyan = (t) => `\x1b[36m${t}\x1b[0m`;
@@ -28,14 +41,21 @@ async function main() {
   // Step 1: Initialize AgentGuard
   console.log(cyan('[STEP 1/6] Initializing AgentGuard Vault & Policy Engine...'));
   const guard = new AgentGuard({
-    contractId: 'blackquokka5481.testnet',
+    contractId: config.vaultAccount || 'longdata4360.testnet',
+    networkId: 'testnet',
+    nodeUrl: config.rpcUrl || 'https://rpc.testnet.near.org',
+    useTeeSigner: !!outlayerPaymentKey,
+    outlayer: {
+      paymentKey: outlayerPaymentKey,
+      signerProject,
+    },
     policy: {
       dailySpendingCap: '10000000000000000000000000', // 10 NEAR
       perTxCap: '2000000000000000000000000',          // 2 NEAR
       allowedTargets: ['intents.near', 'wrap.near', 'v2.ref-finance.near'],
     },
   });
-  console.log('  Vault Account: ' + bold('blackquokka5481.testnet'));
+  console.log('  Vault Account: ' + bold(config.vaultAccount || 'longdata4360.testnet'));
   console.log('  Daily Cap: ' + green('10.0 NEAR') + ' | Per-Tx Autonomous Cap: ' + green('2.0 NEAR') + '\n');
 
   // Step 2: Anchor Firewall Key in OutLayer Intel TDX TEE
