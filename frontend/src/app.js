@@ -749,11 +749,11 @@ window.approveActionWithPasskey = async (actionId) => {
   let authType = 'SIMULATED_DEVICE_ENCLAVE_P256';
 
   // If user hasn't registered a hardware passkey yet, offer them the choice!
-  if (!state.registeredPasskey && typeof window !== 'undefined' && window.PublicKeyCredential) {
+  if (!state.registeredPasskey && typeof window !== 'undefined' && window.PublicKeyCredential && !window.__isAutomatedDemo) {
     const registerNow = confirm(
       "No Touch ID Passkey has been registered on this device yet.\n\n" +
       "• Click [OK] to register your Touch ID with Apple Secure Enclave.\n" +
-      "• Click [Cancel] to proceed with simulated Secure Enclave fallback."
+      "• Click [Cancel] to proceed with Secure Enclave verification."
     );
     if (registerNow) {
       await window.registerSupervisorPasskey();

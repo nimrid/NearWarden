@@ -31,5 +31,8 @@
   "license": "MIT",
   "dependencies": {
     "near-api-js": "^7.3.1"
+  },
+  "devDependencies": {
+    "puppeteer": "^25.16.0"
   }
 }

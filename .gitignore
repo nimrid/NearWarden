@@ -5,3 +5,13 @@ dist/
 *.log
 .env
 .env.local
+
+# Demo video & media
+demo_video/
+*.mp4
+*.mov
+*.webm
+*.mkv
+*.avi
+scripts/generate_bgm.py
+scripts/generate_voiceover.py
