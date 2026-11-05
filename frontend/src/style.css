@@ -774,6 +774,52 @@ body {
 /* ========================================================= */
 /* WAF CONSOLE STYLES                                        */
 /* ========================================================= */
+.rpc-connect-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(56, 139, 253, 0.08);
+  border: 1px solid rgba(56, 139, 253, 0.3);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  margin-bottom: 12px;
+}
+
+.rpc-icon {
+  color: #58a6ff;
+  font-size: 14px;
+}
+
+.rpc-label {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.rpc-connect-bar .input-contract {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  color: #58a6ff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  outline: none;
+  width: 220px;
+}
+
+.rpc-connect-bar .input-contract:focus {
+  border-color: #388bfd;
+}
+
+.rpc-status-msg {
+  color: #7ee787;
+  font-size: 11px;
+  margin-left: auto;
+}
+
 .telemetry-strip {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -1561,6 +1607,20 @@ body {
   background: linear-gradient(135deg, #2563eb, #3b82f6);
   box-shadow: 0 0 14px rgba(59, 130, 246, 0.6);
   transform: translateY(-1px);
+}
+
+.network-badge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(46, 160, 67, 0.12);
+  border: 1px solid rgba(63, 185, 80, 0.35);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: #7ee787;
+  user-select: none;
 }
 
 .passkey-badge-chip {

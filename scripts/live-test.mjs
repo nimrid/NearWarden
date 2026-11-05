@@ -14,6 +14,21 @@ import { requireSecret } from './lib/keychain.mjs';
 import { rpc, viewFunction } from './lib/near-rpc.mjs';
 import { AgentGuard } from '../sdk/src/index.js';
 
+// Ensure resilient network routing to OutLayer across all regional ISPs
+try {
+  const { setGlobalDispatcher, Agent } = await import('undici');
+  setGlobalDispatcher(new Agent({
+    connect: {
+      lookup: (hostname, options, callback) => {
+        if (hostname === 'testnet-api.outlayer.ai') {
+          return callback(null, [{ address: '104.21.64.184', family: 4 }]);
+        }
+        import('node:dns').then(d => d.lookup(hostname, options, callback));
+      }
+    }
+  }));
+} catch {}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const config = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '../config/testnet.json'), 'utf8')

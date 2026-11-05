@@ -991,7 +991,6 @@ mod tests {
 
     fn passkey_keypair() -> (p256::ecdsa::SigningKey, String) {
         use p256::ecdsa::SigningKey;
-        use p256::elliptic_curve::sec1::ToEncodedPoint;
         let sk = SigningKey::from_slice(&[9u8; 32]).unwrap();
         let sec1 = sk.verifying_key().to_encoded_point(false);
         (sk, hex::encode(sec1.as_bytes()))
