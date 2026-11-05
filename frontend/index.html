@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AgentGuard — On-Chain WAF & Spending Policy Engine for AI Agents</title>
   <meta name="description" content="Programmable Security Firewall, Spending Policy Engine & Sandboxed Vault for Autonomous Agents on NEAR Protocol." />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ec97' stroke-width='2'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/><path d='M9 12l2 2 4-4'/></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -120,7 +121,7 @@
         </div>
       </div>
 
-      <!-- Interactive Hero Terminal (Attack vs Defense Simulator) -->
+      <!-- Interactive Hero Terminal (Attack vs Defense Inspector) -->
       <div class="hero-right">
         <div class="hero-terminal">
           <div class="terminal-header">
@@ -150,7 +151,7 @@
             </div>
 
             <div class="terminal-action-row">
-              <button class="btn btn-default btn-xs" id="btn-hero-execute" onclick="window.runHeroSimulation()">
+              <button class="btn btn-default btn-xs" id="btn-hero-execute" onclick="window.runHeroInspection()">
                 ▶ Run Firewall Inspection
               </button>
               <span class="t-threat" id="hero-threat-meter">Threat Score: 0/100</span>
@@ -496,7 +497,7 @@ firewall = NearFirewall(vault=<span class="t-str">"longdata4360.testnet"</span>,
             <span class="judge-time" id="judge-run-timestamp">Status: Ready to Evaluate</span>
           </div>
           <h4 id="judge-status-headline">Deterministic Failure Mode Gates (0 / 5 Passed)</h4>
-          <p class="judge-summary-desc">Simulate standard adversarial failure modes to verify pre-flight firewall interception, contract allowlists, spending limits, and instant key freezing.</p>
+          <p class="judge-summary-desc">Evaluate standard adversarial failure modes to verify pre-flight firewall interception, contract allowlists, spending limits, and instant key freezing.</p>
         </div>
         <div class="judge-summary-right">
           <button id="btn-run-all-tests-main" class="btn btn-primary btn-sm">

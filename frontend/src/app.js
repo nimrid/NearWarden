@@ -229,7 +229,7 @@ window.switchToTab = (tabId) => {
   if (pane) pane.classList.add('active');
 };
 
-window.runHeroSimulation = () => {
+window.runHeroInspection = () => {
   const s = HERO_SCENARIOS[currentHeroScenarioId];
   if (!s) return;
 
@@ -273,6 +273,7 @@ window.runHeroSimulation = () => {
 
   renderTelemetry();
 };
+window.runHeroSimulation = window.runHeroInspection;
 
 // Switch SDK Code Tabs
 window.switchSdkTab = (tabId) => {
@@ -621,7 +622,7 @@ function renderPendingQueue() {
         <p>Queue clean. No transactions currently waiting for human approval.</p>
         <button class="btn btn-default btn-xs" style="margin-top: 12px; display: inline-flex; align-items: center; gap: 6px;" onclick="window.seedEscalatedTestTx()">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-          Simulate 5.0 NEAR Escalated Tx (Test Touch ID)
+          Enqueue 5.0 NEAR Escalated Tx (Test Touch ID)
         </button>
       </div>
     `;
@@ -1470,6 +1471,7 @@ async function syncOnChainState() {
   }
 }
 
+window.syncOnChainState = syncOnChainState;
 elBtnSyncChain?.addEventListener('click', syncOnChainState);
 
 // Initial Render & Live Testnet Sync
