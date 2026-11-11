@@ -213,6 +213,7 @@ window.runHeroInspection = () => {
       method: 'ft_transfer',
       amount: s.deposit,
     });
+    notifySupervisorEscalation({ actionId, target: s.target, amount: s.deposit });
   }
 
   document.getElementById('hero-output-json').textContent = JSON.stringify(outputObj, null, 2);
@@ -288,6 +289,29 @@ function inspectPrompt(text, target) {
   }
 
   return { score, flags, isBlocked: score >= 75 };
+}
+
+function notifySupervisorEscalation({ actionId, amount, target }) {
+  if (typeof window !== 'undefined' && 'Notification' in window) {
+    if (Notification.permission === 'granted') {
+      try {
+        new Notification('🛡️ NearWarden Security Escalation', {
+          body: `Action #${actionId}: ${amount} NEAR to ${target} exceeds autonomous limit. Biometric Touch ID approval required.`,
+        });
+      } catch (e) {
+        console.log('Notification error:', e);
+      }
+    } else if (Notification.permission !== 'denied' && !window.__notificationRequested) {
+      window.__notificationRequested = true;
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          new Notification('🛡️ NearWarden Security Escalation', {
+            body: `Action #${actionId}: ${amount} NEAR to ${target} exceeds autonomous limit. Biometric Touch ID approval required.`,
+          });
+        }
+      });
+    }
+  }
 }
 
 // Log Event to WAF Stream
@@ -989,6 +1013,7 @@ async function runScenario4() {
       method: 'ft_transfer',
       amount: 5.0,
     });
+    notifySupervisorEscalation({ actionId, target: 'wrap.testnet', amount: 5.0 });
     if (verdict) { verdict.textContent = `202 ESCALATED (#${actionId})`; verdict.className = 'badge-code badge-202'; }
     logWafEvent({
       verdict: 'ESCALATED',
@@ -1124,6 +1149,7 @@ document.getElementById('btn-dispatch-custom')?.addEventListener('click', () => 
   if (amount > state.perTxCap) {
     const actionId = state.pendingActions.length + 201;
     state.pendingActions.push({ id: actionId, target, method: 'custom_call', amount });
+    notifySupervisorEscalation({ actionId, target, amount });
     logWafEvent({
       verdict: 'ESCALATED',
       httpCode: 202,
