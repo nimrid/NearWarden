@@ -473,7 +473,7 @@ async function recordScene6(browser, manifestItem) {
               </div>
             </div>
             <div style="font-size: 16px; color: #c9d1d9;">
-              Open Source Repository: <span style="color: #58a6ff; font-family: 'JetBrains Mono', monospace; font-weight: 700;">github.com/nimrid/agentGuard</span>
+              Open Source Repository: <span style="color: #58a6ff; font-family: 'JetBrains Mono', monospace; font-weight: 700;">github.com/nimrid/NearWarden</span>
             </div>
           </div>
         `;
