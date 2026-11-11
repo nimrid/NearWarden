@@ -1,6 +1,6 @@
 {
   "display": {
-    "name": "AgentGuard Firewall Signer"
+    "name": "NearWarden Firewall Signer"
   },
   "operations": [
     "public_key",

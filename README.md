@@ -1,10 +1,12 @@
-# AgentGuard
+# NearWarden
 
 > Programmable AI Security Firewall, Spending Policy Engine & Sandboxed Vault on NEAR Protocol.
 
 [![NEAR Hackathon 2026](https://img.shields.io/badge/NEAR%20Hackathon-2026-blue.svg)](https://nearhackathon.com)
 [![Tracks](https://img.shields.io/badge/Tracks-security%20%7C%20agents-purple.svg)](https://nearhackathon.com)
-[![Test Suite](https://img.shields.io/badge/Evaluation-5%2F5%20Passed-brightgreen.svg)](tests/run-judge-eval.js)
+[![Judge Eval](https://img.shields.io/badge/Judge%20Eval-5%2F5%20Passed-brightgreen.svg)](tests/run-judge-eval.js)
+[![SDK Tests](https://img.shields.io/badge/SDK%20Tests-59%2F59%20Passed-brightgreen.svg)](sdk/tests)
+[![Contract Tests](https://img.shields.io/badge/Contract%20Tests-25%2F25%20Passed-brightgreen.svg)](contracts/src/lib.rs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -17,8 +19,8 @@ Autonomous AI agents (trading bots, multi-agent swarms, autonomous procurement a
 2. **Missing Dynamic Controls:** Native blockchain accounts lack runtime AI intent filtering, rolling velocity limits, per-transaction caps, and automated multi-sig escalation.
 3. **Black-Box Execution:** Operators lack instant kill-switches and transparent telemetry once autonomous agent loops run in production.
 
-**AgentGuard** resolves this by introducing a **decoupled perimeter wallet firewall and on-chain policy engine** for NEAR Protocol:
-- The AI agent **never holds a Full Access Key**. It operates solely via **Function Call Keys (FCKs)** scoped to the AgentGuard vault.
+**NearWarden** resolves this by introducing a **decoupled perimeter wallet firewall and on-chain policy engine** for NEAR Protocol:
+- The AI agent **never holds a Full Access Key**. It operates solely via **Function Call Keys (FCKs)** scoped to the NearWarden vault.
 - Every intent is inspected pre-flight for prompt-injection attacks.
 - Transactions are evaluated on-chain against **rolling daily budgets**, **per-transaction caps**, **contract allowlists**, and **velocity limiters**.
 - High-value transactions automatically escalate to a **Human-in-the-Loop Multi-Sig Queue**.
@@ -36,7 +38,7 @@ Autonomous AI agents (trading bots, multi-agent swarms, autonomous procurement a
                                 │ Natural Language / Tool Intent
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              AgentGuard AI Firewall Proxy (SDK)                 │
+│              NearWarden AI Firewall Proxy (SDK)                 │
 │  - Prompt-Injection & Jailbreak Detector (Heuristic Scanner)    │
 │  - Blacklisted Destination & Phishing Quarantine                │
 │  - Slippage Tolerance Verifier (< 1.5% max)                     │
@@ -145,18 +147,25 @@ npm run test:contracts
 
 **See (Expected Output):**
 ```text
-running 9 tests
+running 25 tests
 test tests::test_daily_quota_exhaustion ... ok
-test tests::test_firewall_attestation_tampered_signature_rejected - should panic ... ok
 test tests::test_emergency_freeze ... ok
 test tests::test_escalation_on_high_value_transaction ... ok
+test tests::test_firewall_attestation_tampered_signature_rejected - should panic ... ok
 test tests::test_firewall_bypass_rejected_when_attestation_missing - should panic ... ok
+test tests::test_init_rejects_missing_firewall_key - should panic ... ok
 test tests::test_initialization ... ok
-test tests::test_safe_intent_execution ... ok
-test tests::test_unauthorized_target_rejection ... ok
+test tests::test_passkey_approval_succeeds_with_biometric_signature ... ok
+test tests::test_passkey_enforcement_blocks_unsigned_approval - should panic ... ok
+test tests::test_passkey_tampered_signature_rejected - should panic ... ok
+test tests::test_passkey_valid_signature_approves_and_records_spend ... ok
 test tests::test_quota_rollback_on_callback_failure ... ok
+test tests::test_safe_intent_execution ... ok
+test tests::test_serde_policy ... ok
+test tests::test_unauthorized_caller_rejected - should panic ... ok
+test tests::test_unauthorized_target_rejection ... ok
 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 
 ---
@@ -217,8 +226,10 @@ npm run test:sdk
 ✔ PolicyEngine - Flags transactions exceeding per-tx cap for escalation
 ✔ PolicyEngine - Blocks execution when daily quota is exhausted
 ✔ PolicyEngine - Emergency freeze halts all operations
-ℹ tests 29
-ℹ pass 29
+✔ Passkey - Contract-canonical signing verifies and rejects tampered amount
+✔ Passkey - AgentGuard approveEscalatedWithPasskey dispatches on-chain call with passkey signature
+ℹ tests 59
+ℹ pass 59
 ℹ fail 0
 ```
 
@@ -252,7 +263,7 @@ npm run test:live
 
 **See (Expected Output):**
 ```text
-=== AgentGuard live testnet tests ===
+=== NearWarden live testnet tests ===
 Vault: longdata4360.testnet | Multisig owner: guard.longdata4360.testnet | Agent: agent.longdata4360.testnet
 
   [PASS] get_vault_status owner is multisig owner=guard.longdata4360.testnet
@@ -331,7 +342,7 @@ pub fn is_attestation_consumed(&self, digest_hex: String) -> bool;
 
 ### Dual-Enclave Architecture: OutLayer Intel TDX + Biometric WebAuthn Passkeys
 
-AgentGuard establishes a **Dual-Enclave Separation of Powers** that divides authority between autonomous machine agents and human supervisors:
+NearWarden establishes a **Dual-Enclave Separation of Powers** that divides authority between autonomous machine agents and human supervisors:
 
 1. **Machine Realm (Autonomous Cloud Enclave)**:
    - The AI Agent operates exclusively with Scoped Function Call Keys (FCKs).
@@ -359,7 +370,7 @@ AgentGuard establishes a **Dual-Enclave Separation of Powers** that divides auth
 
 ## 6. Developer SDK: Chain Abstraction & Agent Framework Middleware
 
-AgentGuard includes first-class adapters for cross-chain intents and plug-and-play middleware for autonomous agent frameworks:
+NearWarden includes first-class adapters for cross-chain intents and plug-and-play middleware for autonomous agent frameworks:
 
 ### 1. Cross-Chain Intents (30+ Blockchains via 1Click Defuse)
 Safely route cross-chain swaps between NEAR, Solana, Base, Ethereum, Bitcoin, and Arbitrum with automatic address format validation and strict slippage bounds:
@@ -379,8 +390,8 @@ const intent = adapter.buildCrossChainSwapIntent({
   expectedAmountOut: '47000000',
 });
 
-// Fetch live cryptographically signed quote from Defuse solver network
-const quote = await adapter.simulateCrossChainQuote({
+// Fetch live cryptographically signed quote from Defuse solver network (hits live 1Click API)
+const quote = await adapter.fetchCrossChainQuote({
   originAsset: 'near:wNEAR',
   destinationAsset: 'solana:SOL',
   destinationChain: 'solana',
@@ -390,7 +401,7 @@ const quote = await adapter.simulateCrossChainQuote({
 ```
 
 ### 2. ElizaOS Plugin (`createElizaPlugin`)
-Protect autonomous ElizaOS agents by dropping in the AgentGuard security plugin:
+Protect autonomous ElizaOS agents by dropping in the NearWarden security plugin:
 
 ```javascript
 import { AgentGuard, createElizaPlugin } from '@near-agent-guard/sdk';
@@ -472,7 +483,7 @@ agent-guard/
 │       ├── lib.rs                 # Contract state, key scoping, Promise execution & callbacks
 │       ├── policy.rs              # Daily spending caps, per-tx limits, velocity check & rollback
 │       └── escalation.rs          # Pending approval queue & status lifecycle
-├── sdk/                           # AgentGuard AI Firewall & Enforcement SDK
+├── sdk/                           # NearWarden AI Firewall & Enforcement SDK
 │   ├── package.json
 │   ├── src/
 │   │   ├── firewall.js            # Prompt injection & jailbreak analyzer (Claude Haiku 5.5 + Heuristics)
@@ -481,7 +492,7 @@ agent-guard/
 │   │   ├── outlayer-client.js     # OutLayer TEE Intel TDX enclave key custody client
 │   │   ├── passkey.js             # WebAuthn Biometric Passkey supervisor module (Touch ID / P-256)
 │   │   ├── middleware.js          # Drop-in ElizaOS plugin & LangChain tool wrapper
-│   │   └── index.js               # Unified AgentGuard SDK with near-api-js integration
+│   │   └── index.js               # Unified NearWarden SDK with near-api-js integration
 │   └── tests/
 │       ├── firewall.test.js       # Prompt injection test suite (Claude Haiku 5.5)
 │       ├── policy.test.js         # Spending limit & velocity tests
@@ -500,9 +511,9 @@ agent-guard/
 
 ---
 
-## 7. Submission Checklist
+## 8. Submission Checklist
 
-- [x] Public GitHub Repository initialized.
+- [x] Repository initialized; **must be made public before 2026-11-14T23:59:00Z**.
 - [x] Tracks: `security` (AI Security & Defense) and `agents` (Agent Economy).
 - [x] Structured "Do X — See Y" steps included for AI Judges.
 - [x] Zero hardcoded private keys or secrets.
@@ -511,4 +522,4 @@ agent-guard/
 
 ---
 
-*Built with ❤️ for NEAR HACKATHON 2026.*
+*Built with ❤️ for NEAR HACKATHON 2026 · formerly AgentGuard.*

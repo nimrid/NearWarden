@@ -1,7 +1,7 @@
 {
   "name": "agent-guard-cockpit",
   "version": "1.0.0",
-  "description": "AgentGuard Cyberpunk Security Cockpit and Testnet Vault Console",
+  "description": "NearWarden Cyberpunk Security Cockpit and Testnet Vault Console",
   "scripts": {
     "dev": "vite --port 3000 --host",
     "build": "vite build",

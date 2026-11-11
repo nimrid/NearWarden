@@ -1,6 +1,6 @@
 # Key Management & Operations Runbook
 
-AgentGuard follows standard key-custody practice: no private key is ever
+NearWarden follows standard key-custody practice: no private key is ever
 stored in the repository, in a `.env` file, or in application memory longer
 than a single signing operation.
 
@@ -36,9 +36,9 @@ than a single signing operation.
 ## Publishing the TEE signer (OutLayer testnet dashboard)
 
 1. Open the OutLayer testnet dashboard and connect `longdata4360.testnet`.
-2. Create project `agentguard-firewall-signer` (id will be
-   `longdata4360.testnet/agentguard-firewall-signer`).
-3. Publish [agentguard-firewall-signer.wasm](/Users/hng/agent-guard/enclave/firewall-signer/out/agentguard-firewall-signer.wasm)
+2. Create project `nearwarden-firewall-signer` (id will be
+   `longdata4360.testnet/nearwarden-firewall-signer`).
+3. Publish [nearwarden-firewall-signer.wasm](/Users/hng/agent-guard/enclave/firewall-signer/out/nearwarden-firewall-signer.wasm)
    (sha256 `524e9694e8dd054bf9611d68d121e5c9f34eb4fdc33cf7c924b83c968fec57cf`)
    as a WasmUrl version and set it active. The signing key is bound to the
    project, so it survives later version upgrades.

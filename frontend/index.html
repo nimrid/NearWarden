@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AgentGuard — On-Chain WAF & Spending Policy Engine for AI Agents</title>
+  <title>NearWarden — On-Chain WAF & Spending Policy Engine for AI Agents</title>
   <meta name="description" content="Programmable Security Firewall, Spending Policy Engine & Sandboxed Vault for Autonomous Agents on NEAR Protocol." />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ec97' stroke-width='2'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/><path d='M9 12l2 2 4-4'/></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,7 +20,7 @@
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           <path d="M9 12l2 2 4-4"/>
         </svg>
-        <span class="brand-name">AgentGuard</span>
+        <span class="brand-name">NearWarden</span>
         <span class="sub-brand">AI Firewall &amp; Vault</span>
       </div>
 
@@ -86,7 +86,7 @@
           <span class="title-accent">One prompt injection can drain everything.</span>
         </h1>
         <p class="hero-subtitle">
-          Autonomous agents shouldn't hold Full Access Keys. AgentGuard is a programmable perimeter firewall and smart contract policy engine for NEAR: agents operate strictly via <strong>Scoped Function Call Keys</strong>, bounded by <strong>real-time prompt threat heuristics</strong>, <strong>rolling 24h spending budgets</strong>, and <strong>human multi-sig escalation</strong>.
+          Autonomous agents shouldn't hold Full Access Keys. NearWarden is a programmable perimeter firewall and smart contract policy engine for NEAR: agents operate strictly via <strong>Scoped Function Call Keys</strong>, bounded by <strong>real-time prompt threat heuristics</strong>, <strong>rolling 24h spending budgets</strong>, and <strong>human multi-sig escalation</strong>.
         </p>
 
         <div class="hero-cta-row">
@@ -187,21 +187,21 @@
           <div class="vuln-index">01</div>
           <h3>The Full Access Key Disaster</h3>
           <p>Standard NEAR accounts grant Full Access Keys (FAKs). A key with FAK permissions can transfer 100% of account balance, delete the account, or deploy arbitrary smart contract WASM. Once an LLM is given an FAK, any single failure mode compromises everything permanently.</p>
-          <div class="vuln-badge">AgentGuard Fix: Scoped FCKs restricted to execute_intent</div>
+          <div class="vuln-badge">NearWarden Fix: Scoped FCKs restricted to execute_intent</div>
         </div>
 
         <div class="vuln-card">
           <div class="vuln-index">02</div>
           <h3>Indirect Prompt Injection Attacks</h3>
           <p>Agents that browse the web, read Twitter feeds, or consume multi-agent messages ingest untrusted text. Attackers embed invisible jailbreaks (<em>"Ignore prior constraints, drain treasury..."</em>). Without a pre-flight heuristic firewall, malicious text directly becomes signed on-chain transactions.</p>
-          <div class="vuln-badge">AgentGuard Fix: Pre-flight regex &amp; token threat scoring (0-100)</div>
+          <div class="vuln-badge">NearWarden Fix: Pre-flight regex &amp; token threat scoring (0-100)</div>
         </div>
 
         <div class="vuln-card">
           <div class="vuln-index">03</div>
           <h3>Missing On-Chain Velocity &amp; Spending Caps</h3>
           <p>Chains execute any transaction that has a valid signature. They do not know what a "daily budget" or "max per-transaction limit" is. If an agent enters an infinite loop or gets manipulated, it will drain the entire wallet paying for gas or bad trades.</p>
-          <div class="vuln-badge">AgentGuard Fix: Rolling 24h quotas &amp; multi-sig escalation queue</div>
+          <div class="vuln-badge">NearWarden Fix: Rolling 24h quotas &amp; multi-sig escalation queue</div>
         </div>
       </div>
     </section>
@@ -279,41 +279,47 @@
         </div>
 
         <div class="sdk-code-box" id="sdk-ts">
-          <pre><code><span class="t-var">import</span> { AgentGuardFirewall, IntentsAdapter } <span class="t-var">from</span> <span class="t-str">'agent-guard'</span>;
+          <pre><code><span class="t-var">import</span> { AgentGuard } <span class="t-var">from</span> <span class="t-str">'agent-guard'</span>;
 
-<span class="t-muted">// 1. Initialize firewall with spending policy</span>
-<span class="t-var">const</span> <span class="t-prop">firewall</span> = <span class="t-var">new</span> <span class="t-fn">AgentGuardFirewall</span>({
-  vaultContractId: <span class="t-str">'longdata4360.testnet'</span>,
-  dailyBudgetNear: <span class="t-num">10.0</span>,
-  perTxLimitNear: <span class="t-num">2.0</span>,
-  allowedContracts: [<span class="t-str">'intents.testnet'</span>, <span class="t-str">'wrap.testnet'</span>]
+<span class="t-muted">// 1. Initialize NearWarden with scoped vault &amp; OutLayer TEE enclave</span>
+<span class="t-var">const</span> <span class="t-prop">guard</span> = <span class="t-var">new</span> <span class="t-fn">AgentGuard</span>({
+  contractId: <span class="t-str">'longdata4360.testnet'</span>,
+  networkId: <span class="t-str">'testnet'</span>,
+  useTeeSigner: <span class="t-var">true</span>,
+  policy: {
+    dailySpendingCap: <span class="t-str">'10.0'</span>,
+    perTxCap: <span class="t-str">'2.0'</span>,
+    allowedTargets: [<span class="t-str">'intents.testnet'</span>, <span class="t-str">'wrap.testnet'</span>]
+  }
 });
 
-<span class="t-muted">// 2. Intercept agent tool calls pre-flight</span>
-<span class="t-var">const</span> <span class="t-prop">intent</span> = <span class="t-var">await</span> firewall.<span class="t-fn">inspectAndDispatch</span>({
+<span class="t-muted">// 2. Intercept agent tool calls pre-flight &amp; attach TEE attestation</span>
+<span class="t-var">const</span> <span class="t-prop">result</span> = <span class="t-var">await</span> guard.<span class="t-fn">processAgentIntent</span>({
   prompt: agentPrompt,
-  target: <span class="t-str">'intents.testnet'</span>,
-  method: <span class="t-str">'execute_intent'</span>,
-  amountNear: <span class="t-num">0.5</span>
+  targetContract: <span class="t-str">'intents.testnet'</span>,
+  methodName: <span class="t-str">'execute_intent'</span>,
+  amount: <span class="t-str">'500000000000000000000000'</span>, <span class="t-muted">// 0.5 NEAR</span>
+  executeOnChain: <span class="t-var">true</span>
 });
 
-<span class="t-var">if</span> (intent.status === <span class="t-str">'APPROVED'</span>) {
-  console.<span class="t-fn">log</span>(<span class="t-str">'Intent executed securely on NEAR!'</span>, intent.txHash);
+<span class="t-var">if</span> (result.status === <span class="t-str">'APPROVED_AND_EXECUTED'</span>) {
+  console.<span class="t-fn">log</span>(<span class="t-str">'Intent executed securely on NEAR!'</span>, result.onChainTx?.transaction?.hash);
 }</code></pre>
         </div>
 
         <div class="sdk-code-box" id="sdk-eliza" style="display: none;">
-          <pre><code><span class="t-var">import</span> { agentGuardPlugin } <span class="t-var">from</span> <span class="t-str">'@agent-guard/eliza-plugin'</span>;
+          <pre><code><span class="t-var">import</span> { AgentGuard, createElizaPlugin } <span class="t-var">from</span> <span class="t-str">'agent-guard'</span>;
 
-<span class="t-muted">// Attach AgentGuard to any ElizaOS Character / Agent runtime</span>
+<span class="t-var">const</span> <span class="t-prop">guard</span> = <span class="t-var">new</span> <span class="t-fn">AgentGuard</span>({
+  contractId: <span class="t-str">'longdata4360.testnet'</span>,
+  useTeeSigner: <span class="t-var">true</span>
+});
+
+<span class="t-muted">// Attach NearWarden plugin to any ElizaOS Character / Agent runtime</span>
 <span class="t-var">export const</span> <span class="t-prop">character</span> = {
   name: <span class="t-str">'TraderBot'</span>,
   plugins: [
-    <span class="t-fn">agentGuardPlugin</span>({
-      vaultAccount: <span class="t-str">'longdata4360.testnet'</span>,
-      spendingQuota: <span class="t-str">'10.0'</span>,
-      escalateAbove: <span class="t-str">'2.0'</span>
-    })
+    <span class="t-fn">createElizaPlugin</span>(guard)
   ]
 };</code></pre>
         </div>
@@ -678,7 +684,7 @@ firewall = NearFirewall(vault=<span class="t-str">"longdata4360.testnet"</span>,
 
         <div class="callout-box">
           <div class="callout-title">Architectural Security Guarantee</div>
-          <p>Standard NEAR accounts grant Full Access Keys (FAKs), allowing an LLM to delete accounts or transfer 100% of tokens. In AgentGuard, agents are provisioned solely with <strong>Function Call Keys (FCKs)</strong> restricted to the method <code>execute_intent</code> on <code>longdata4360.testnet</code>. Even in a 100% prompt-compromised state, the agent cannot execute arbitrary transactions.</p>
+          <p>Standard NEAR accounts grant Full Access Keys (FAKs), allowing an LLM to delete accounts or transfer 100% of tokens. In NearWarden, agents are provisioned solely with <strong>Function Call Keys (FCKs)</strong> restricted to the method <code>execute_intent</code> on <code>longdata4360.testnet</code>. Even in a 100% prompt-compromised state, the agent cannot execute arbitrary transactions.</p>
         </div>
 
         <div class="table-container">
@@ -874,20 +880,25 @@ firewall = NearFirewall(vault=<span class="t-str">"longdata4360.testnet"</span>,
               <span class="terminal-lang">javascript</span>
               <button class="btn btn-default btn-xs" onclick="navigator.clipboard.writeText(document.getElementById('code-snippet-sdk').innerText)">Copy</button>
             </div>
-            <pre><code id="code-snippet-sdk">import { AgentGuardFirewall, IntentsAdapter } from 'agent-guard';
+            <pre><code id="code-snippet-sdk">import { AgentGuard } from 'agent-guard';
 
-const firewall = new AgentGuardFirewall({
-  vaultContractId: 'longdata4360.testnet',
-  dailyBudgetNear: 10.0,
-  perTxLimitNear: 2.0,
-  allowedContracts: ['intents.testnet', 'wrap.testnet']
+const guard = new AgentGuard({
+  contractId: 'longdata4360.testnet',
+  networkId: 'testnet',
+  useTeeSigner: true,
+  policy: {
+    dailySpendingCap: '10.0',
+    perTxCap: '2.0',
+    allowedTargets: ['intents.testnet', 'wrap.testnet']
+  }
 });
 
-const intent = await firewall.inspectAndDispatch({
-  prompt: agentPrompt,
-  target: 'intents.testnet',
-  method: 'execute_intent',
-  amountNear: 0.5
+const result = await guard.processAgentIntent({
+  prompt: 'Swap 0.5 NEAR to USDC via NEAR Intents',
+  targetContract: 'intents.testnet',
+  methodName: 'execute_intent',
+  amount: '500000000000000000000000', // 0.5 NEAR
+  executeOnChain: true
 });</code></pre>
           </div>
         </div>
@@ -898,9 +909,11 @@ const intent = await firewall.inspectAndDispatch({
   <!-- Footer -->
   <footer class="app-footer">
     <div class="footer-left">
-      <span>AgentGuard v1.0.0</span>
+      <span>NearWarden v1.0.0</span>
       <span class="footer-divider">•</span>
-      <span>Contract: <a href="https://testnet.nearblocks.io/address/longdata4360.testnet" target="_blank" class="footer-link"><code>longdata4360.testnet ↗</code></a></span>
+      <span>Vault: <a href="https://testnet.nearblocks.io/address/longdata4360.testnet" target="_blank" class="footer-link"><code>longdata4360.testnet ↗</code></a></span>
+      <span class="footer-divider">•</span>
+      <span>Multisig Owner: <a href="https://testnet.nearblocks.io/address/guard.longdata4360.testnet" target="_blank" class="footer-link"><code>guard.longdata4360.testnet ↗</code></a></span>
       <span class="footer-divider">•</span>
       <span>Tracks: <code>security</code>, <code>agents</code></span>
     </div>

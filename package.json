@@ -27,7 +27,7 @@
     "outlayer",
     "tee"
   ],
-  "author": "AgentGuard Team",
+  "author": "NearWarden Team",
   "license": "MIT",
   "dependencies": {
     "near-api-js": "^7.3.1"

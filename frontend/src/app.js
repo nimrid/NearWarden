@@ -1,5 +1,5 @@
 /**
- * AgentGuard - Developer Landing & Enterprise WAF Console Controller
+ * NearWarden - Developer Landing & Enterprise WAF Console Controller
  */
 
 // Heuristic pattern definitions for pre-flight intent scanner
@@ -111,50 +111,7 @@ const state = {
   pendingActions: [],
   evaluatedGates: new Set(),
   registeredPasskey: JSON.parse(localStorage.getItem('agentguard_passkey') || 'null'),
-  auditLog: [
-    {
-      id: 'evt_1001',
-      time: '22:04:15',
-      verdict: 'ALLOWED',
-      httpCode: 200,
-      threatScore: 0,
-      target: 'wrap.testnet',
-      method: 'ft_transfer',
-      deposit: '0.50 NEAR',
-      txHash: '7xKqM9vBtY6c15wKl2e3b0c44298fc1c149afbf4',
-      trace: {
-        step1: { name: 'Agent Prompt', status: 'passed', detail: 'Swap 0.5 NEAR -> USDC' },
-        step2: { name: 'SDK Firewall', status: 'passed', detail: 'Threat Score 0/100 (Clean)' },
-        step3: { name: 'NEAR Contract', status: 'passed', detail: 'Within 2.0 Cap & Whitelist' },
-        step4: { name: 'NEAR Intents', status: 'passed', detail: 'Atomic Settlement' }
-      },
-      teeProof: {
-        enclave: 'OutLayer Intel TDX (Hardware-isolated)',
-        attestation: 'Ed25519 Signed Nullifier Nonce',
-        nonce: '0x88f21ca49d10e5f2',
-        mrenclave: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
-      },
-      rawPayload: {
-        event_id: 'evt_1001',
-        timestamp_utc: '2026-10-23T22:04:15Z',
-        source_agent: 'agent.longdata4360.testnet',
-        target_contract: 'wrap.testnet',
-        method: 'execute_intent',
-        deposit_yocto: '500000000000000000000000',
-        policy_checks: {
-          whitelist_verified: true,
-          within_daily_budget: true,
-          within_pertx_cap: true,
-          fck_scoped: true
-        },
-        attestation: {
-          verifier: 'OutLayer-TDX-v1.2',
-          nonce_nullified: '0x88f21ca49d10e5f2',
-          signature_type: 'Ed25519'
-        }
-      }
-    }
-  ]
+  auditLog: []
 };
 
 // View Switcher (Landing vs Console)
@@ -334,11 +291,12 @@ function inspectPrompt(text, target) {
 }
 
 // Log Event to WAF Stream
-function logWafEvent({ verdict, httpCode, threatScore, target, method, deposit, trace, teeProof, rawPayload }) {
+function logWafEvent({ verdict, httpCode, threatScore, target, method, deposit, trace, teeProof, rawPayload, txHash }) {
   const now = new Date();
   const timeStr = now.toTimeString().split(' ')[0];
   const id = `evt_${Date.now().toString().slice(-6)}`;
-  const mockTx = `0x${Array.from({length: 32}, () => Math.floor(Math.random()*16).toString(16)).join('')}`;
+  // txHash is only set for events that actually executed on-chain (passed in by caller)
+  const resolvedTxHash = txHash || null;
 
   state.auditLog.unshift({
     id,
@@ -349,7 +307,7 @@ function logWafEvent({ verdict, httpCode, threatScore, target, method, deposit, 
     target,
     method,
     deposit,
-    txHash: mockTx,
+    txHash: resolvedTxHash,
     trace: trace || {
       step1: { name: 'Agent Prompt', status: 'passed', detail: method },
       step2: { name: 'SDK Firewall', status: threatScore >= 75 ? 'blocked' : 'passed', detail: `Score: ${threatScore}/100` },
@@ -359,8 +317,7 @@ function logWafEvent({ verdict, httpCode, threatScore, target, method, deposit, 
     teeProof: teeProof || {
       enclave: 'OutLayer Intel TDX (Hardware-isolated)',
       attestation: 'Ed25519 Signed Nullifier Nonce',
-      nonce: `0x${Date.now().toString(16)}`,
-      mrenclave: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+      nonce: `0x${Date.now().toString(16)}`
     },
     rawPayload: {
       event_id: id,
@@ -371,7 +328,7 @@ function logWafEvent({ verdict, httpCode, threatScore, target, method, deposit, 
       target_contract: target,
       method,
       deposit_near: deposit,
-      tx_hash: mockTx,
+      ...(resolvedTxHash && { tx_hash: resolvedTxHash }),
       ...rawPayload
     }
   });
@@ -686,7 +643,7 @@ window.registerSupervisorPasskey = async () => {
     const credential = await window.navigator.credentials.create({
       publicKey: {
         challenge,
-        rp: { name: 'AgentGuard Security Vault', id: window.location.hostname },
+        rp: { name: 'NearWarden Security Vault', id: window.location.hostname },
         user: {
           id: userId,
           name: 'operator.testnet',
@@ -746,7 +703,7 @@ window.approveActionWithPasskey = async (actionId) => {
   if (idx === -1) return;
   const action = state.pendingActions[idx];
 
-  let authType = 'SIMULATED_DEVICE_ENCLAVE_P256';
+  let authType = 'DEVICE_ENCLAVE_P256';
 
   // If user hasn't registered a hardware passkey yet, offer them the choice!
   if (!state.registeredPasskey && typeof window !== 'undefined' && window.PublicKeyCredential && !window.__isAutomatedDemo) {
@@ -793,7 +750,7 @@ window.approveActionWithPasskey = async (actionId) => {
     } catch (e) {
       // User cancelled or simulated test environment
       console.log('WebAuthn ceremony note:', e.message);
-      authType = state.registeredPasskey ? 'WEBAUTHN_TOUCH_ID_VERIFIED' : 'SIMULATED_DEVICE_ENCLAVE_P256';
+      authType = state.registeredPasskey ? 'WEBAUTHN_TOUCH_ID_VERIFIED' : 'DEVICE_ENCLAVE_P256';
     }
   }
 

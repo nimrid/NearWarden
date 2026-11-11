@@ -1,7 +1,7 @@
 {
   "name": "@agent-guard/sdk",
   "version": "1.0.0",
-  "description": "AgentGuard AI Firewall and Policy Enforcement SDK for Autonomous Agents on NEAR",
+  "description": "NearWarden AI Firewall and Policy Enforcement SDK for Autonomous Agents on NEAR",
   "type": "module",
   "main": "src/index.js",
   "types": "src/index.d.ts",
@@ -16,6 +16,6 @@
     "prompt-injection",
     "intents"
   ],
-  "author": "AgentGuard Team",
+  "author": "NearWarden Team",
   "license": "MIT"
 }

@@ -1,4 +1,4 @@
-//! AgentGuard Firewall Signer — runs inside an OutLayer Intel TDX enclave.
+//! NearWarden Firewall Signer — runs inside an OutLayer Intel TDX enclave.
 //!
 //! The ed25519 signing key is derived by the OutLayer keystore inside the
 //! TEE for this project and caller. This component never sees the key: it
