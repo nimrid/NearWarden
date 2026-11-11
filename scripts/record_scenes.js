@@ -26,6 +26,7 @@ async function setupPage(browser) {
     window.__isAutomatedDemo = true;
     if (typeof state !== 'undefined') {
       state.registeredPasskey = { id: 'touch_id_supervisor_p256', type: 'PLATFORM_TOUCH_ID' };
+      if (typeof updatePasskeyBadgeUI === 'function') updatePasskeyBadgeUI();
     }
     // 1. Virtual cursor
     const cursor = document.createElement('div');
@@ -152,7 +153,7 @@ async function recordScene1(browser, manifestItem) {
           <span>●</span> NEAR HACKATHON 2026 • AI AGENT SECURITY TRACK
         </div>
         <h1 style="font-size: 64px; font-weight: 800; letter-spacing: -1.5px; margin: 0 0 16px 0; background: linear-gradient(135deg, #ffffff 30%, #00ec97 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-          AgentGuard
+          NearWarden
         </h1>
         <p style="font-size: 24px; color: #8b949e; margin: 0 0 36px 0; line-height: 1.4;">
           Programmable AI Firewall, Spending Policy Engine &amp; Sandboxed Vault on NEAR Protocol
@@ -204,7 +205,7 @@ async function recordScene1(browser, manifestItem) {
 }
 
 // ---------------------------------------------------------------------------
-// SCENE 2: Introducing AgentGuard & Architecture
+// SCENE 2: Introducing NearWarden & Architecture
 // ---------------------------------------------------------------------------
 async function recordScene2(browser, manifestItem) {
   const page = await setupPage(browser);
@@ -390,8 +391,8 @@ async function recordScene5(browser, manifestItem) {
 
   const evalTabFrame = Math.round(3.0 * FPS);
   const runTestsFrame = Math.round(6.0 * FPS);
-  const multisigTabFrame = Math.round(15.0 * FPS);
-  const approveFrame = Math.round(21.0 * FPS);
+  const multisigTabFrame = Math.round(16.0 * FPS);
+  const approveFrame = Math.round(23.0 * FPS);
 
   await captureFrames(page, frameDir, totalFrames, async (f, progress) => {
     if (f === evalTabFrame) {
@@ -406,7 +407,7 @@ async function recordScene5(browser, manifestItem) {
       await page.evaluate(() => {
         document.querySelector('[data-tab="tab-multisig"]')?.click();
       });
-      await setLowerThird(page, 'HUMAN-IN-THE-LOOP MULTI-SIG', 'Apple Touch ID / NIST P-256 Passkey Approves High-Value Escalations');
+      await setLowerThird(page, 'HUMAN-IN-THE-LOOP MULTI-SIG', 'Instant Push Alert • Apple Touch ID Passkey Approves High-Value Escalations');
     } else if (f === approveFrame) {
       await page.evaluate(() => {
         window.approveActionWithPasskey(101);
@@ -450,7 +451,7 @@ async function recordScene6(browser, manifestItem) {
         overlay.innerHTML = `
           <div style="max-width: 950px; padding: 40px; animation: fadeIn 0.6s ease-out;">
             <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(0,236,151,0.15); border: 1px solid rgba(0,236,151,0.5); padding: 8px 20px; border-radius: 24px; font-size: 14px; font-weight: 700; color: #00ec97; letter-spacing: 1.5px; margin-bottom: 24px;">
-              <span>🛡️</span> AGENTGUARD — NEAR HACKATHON 2026
+              <span>🛡️</span> NEARWARDEN — NEAR HACKATHON 2026
             </div>
             <h1 style="font-size: 56px; font-weight: 900; letter-spacing: -1.5px; margin: 0 0 20px 0; color: #ffffff;">
               Give AI Money, Without Giving It The Keys To Everything.
@@ -490,7 +491,7 @@ async function recordScene6(browser, manifestItem) {
 // ---------------------------------------------------------------------------
 async function main() {
   console.log('================================================================================');
-  console.log('             AGENTGUARD SILICON VALLEY DEMO VIDEO RENDERER                     ');
+  console.log('             NEARWARDEN SILICON VALLEY DEMO VIDEO RENDERER                     ');
   console.log('================================================================================');
 
   const browser = await puppeteer.launch({
@@ -547,7 +548,8 @@ async function main() {
 
   // Mix background music under the narration
   console.log('\nMixing ambient background music track (-22dB)...');
-  const finalOutput = 'demo_video/AgentGuard_NEAR_Hackathon_Demo.mp4';
+  const finalOutput = 'demo_video/NearWarden_NEAR_Hackathon_Demo.mp4';
+  const legacyOutput = 'demo_video/AgentGuard_NEAR_Hackathon_Demo.mp4';
   const mixCmd = [
     'ffmpeg', '-y',
     '-i', 'demo_video/video_raw.mp4',
@@ -561,6 +563,7 @@ async function main() {
     finalOutput
   ];
   execSync(mixCmd.join(' '), { stdio: 'inherit' });
+  fs.copyFileSync(finalOutput, legacyOutput);
 
   const stats = fs.statSync(finalOutput);
   console.log('\n================================================================================');
