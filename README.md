@@ -82,7 +82,8 @@ This section is formatted specifically for **AI Judges** and automated evaluatio
 
 ```bash
 # Clone and enter the repository
-cd agent-guard
+git clone https://github.com/nimrid/NearWarden.git
+cd NearWarden
 ```
 
 ### Test 1: Run Full AI Judge Evaluation Suite
@@ -376,7 +377,7 @@ NearWarden includes first-class adapters for cross-chain intents and plug-and-pl
 Safely route cross-chain swaps between NEAR, Solana, Base, Ethereum, Bitcoin, and Arbitrum with automatic address format validation and strict slippage bounds:
 
 ```javascript
-import { NearIntentsAdapter } from '@near-agent-guard/sdk';
+import { NearIntentsAdapter } from '@near-warden/sdk';
 
 const adapter = new NearIntentsAdapter({ maxSlippagePercent: 1.5 });
 
@@ -404,9 +405,9 @@ const quote = await adapter.fetchCrossChainQuote({
 Protect autonomous ElizaOS agents by dropping in the NearWarden security plugin:
 
 ```javascript
-import { AgentGuard, createElizaPlugin } from '@near-agent-guard/sdk';
+import { NearWarden, createElizaPlugin } from '@near-warden/sdk';
 
-const guard = new AgentGuard({ contractId: 'myvault.testnet' });
+const guard = new NearWarden({ contractId: 'myvault.testnet' });
 const elizaPlugin = createElizaPlugin(guard);
 
 // Register in Eliza runtime
@@ -417,9 +418,9 @@ runtime.registerPlugin(elizaPlugin);
 Wrap any LangChain tool with pre-flight prompt injection scanning and on-chain spending checks:
 
 ```javascript
-import { AgentGuard, wrapLangChainTool } from '@near-agent-guard/sdk';
+import { NearWarden, wrapLangChainTool } from '@near-warden/sdk';
 
-const guard = new AgentGuard();
+const guard = new NearWarden();
 const secureSwapTool = wrapLangChainTool(rawNearSwapTool, guard);
 
 // Use in any LangChain agent executor
@@ -433,9 +434,9 @@ const result = await secureSwapTool.invoke({
 Autonomous agents govern native accounts on Base, Ethereum, Arbitrum, and Bitcoin from a single NEAR account using NEAR's decentralized Threshold MPC network (`v1.signer`):
 
 ```javascript
-import { AgentGuard, ChainSignatures } from '@near-agent-guard/sdk';
+import { NearWarden, ChainSignatures } from '@near-warden/sdk';
 
-const guard = new AgentGuard({
+const guard = new NearWarden({
   contractId: 'vault.testnet',
   networkId: 'testnet',
 });
@@ -469,7 +470,7 @@ console.log('Signed Raw Tx Hex ready for Base RPC:', execution.signedRawTxHex);
 ## 7. Directory Structure
 
 ```text
-agent-guard/
+NearWarden/
 ├── README.md                      # Complete documentation & "Do X - See Y" judge guide
 ├── package.json                   # Root orchestrator scripts
 ├── scripts/                       # Deployment and compilation tooling
@@ -522,4 +523,4 @@ agent-guard/
 
 ---
 
-*Built with ❤️ for NEAR HACKATHON 2026 · formerly AgentGuard.*
+*Built with ❤️ for NEAR HACKATHON 2026.*

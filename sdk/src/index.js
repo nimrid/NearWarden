@@ -484,3 +484,7 @@ export class AgentGuard {
     return this.auditHistory.slice(0, limit);
   }
 }
+
+export const NearWarden = AgentGuard;
+export const createNearWardenMiddleware = createAgentGuardMiddleware;
+

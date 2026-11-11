@@ -1,5 +1,5 @@
 {
-  "name": "agent-guard",
+  "name": "near-warden",
   "version": "1.0.0",
   "description": "Programmable Security Firewall, Spending Policy Engine & Sandboxed Vault for Autonomous AI Agents on NEAR",
   "type": "module",

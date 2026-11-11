@@ -14,7 +14,7 @@ import { ThreatLevel } from './firewall.js';
  */
 export function createElizaPlugin(agentGuard) {
   return {
-    name: 'agent-guard',
+    name: 'near-warden',
     description: 'Autonomous security firewall and on-chain spending guardrails for Web3 agents',
     
     // Pre-action security inspector

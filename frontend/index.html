@@ -94,9 +94,9 @@
             Launch Live WAF Console
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </button>
-          <div class="npm-install-badge" onclick="navigator.clipboard.writeText('npm install agent-guard'); this.querySelector('.copy-txt').textContent = 'Copied ✓'; setTimeout(() => this.querySelector('.copy-txt').textContent = 'Copy', 1500);">
+          <div class="npm-install-badge" onclick="navigator.clipboard.writeText('npm install near-warden'); this.querySelector('.copy-txt').textContent = 'Copied ✓'; setTimeout(() => this.querySelector('.copy-txt').textContent = 'Copy', 1500);">
             <span class="npm-prefix">$</span>
-            <code>npm install agent-guard</code>
+            <code>npm install near-warden</code>
             <span class="copy-txt">Copy</span>
           </div>
         </div>
@@ -279,10 +279,10 @@
         </div>
 
         <div class="sdk-code-box" id="sdk-ts">
-          <pre><code><span class="t-var">import</span> { AgentGuard } <span class="t-var">from</span> <span class="t-str">'agent-guard'</span>;
+          <pre><code><span class="t-var">import</span> { NearWarden } <span class="t-var">from</span> <span class="t-str">'near-warden'</span>;
 
 <span class="t-muted">// 1. Initialize NearWarden with scoped vault &amp; OutLayer TEE enclave</span>
-<span class="t-var">const</span> <span class="t-prop">guard</span> = <span class="t-var">new</span> <span class="t-fn">AgentGuard</span>({
+<span class="t-var">const</span> <span class="t-prop">guard</span> = <span class="t-var">new</span> <span class="t-fn">NearWarden</span>({
   contractId: <span class="t-str">'longdata4360.testnet'</span>,
   networkId: <span class="t-str">'testnet'</span>,
   useTeeSigner: <span class="t-var">true</span>,
@@ -308,9 +308,9 @@
         </div>
 
         <div class="sdk-code-box" id="sdk-eliza" style="display: none;">
-          <pre><code><span class="t-var">import</span> { AgentGuard, createElizaPlugin } <span class="t-var">from</span> <span class="t-str">'agent-guard'</span>;
+          <pre><code><span class="t-var">import</span> { NearWarden, createElizaPlugin } <span class="t-var">from</span> <span class="t-str">'near-warden'</span>;
 
-<span class="t-var">const</span> <span class="t-prop">guard</span> = <span class="t-var">new</span> <span class="t-fn">AgentGuard</span>({
+<span class="t-var">const</span> <span class="t-prop">guard</span> = <span class="t-var">new</span> <span class="t-fn">NearWarden</span>({
   contractId: <span class="t-str">'longdata4360.testnet'</span>,
   useTeeSigner: <span class="t-var">true</span>
 });
@@ -325,7 +325,7 @@
         </div>
 
         <div class="sdk-code-box" id="sdk-nearai" style="display: none;">
-          <pre><code><span class="t-var">from</span> agent_guard <span class="t-var">import</span> NearFirewall
+          <pre><code><span class="t-var">from</span> near_warden <span class="t-var">import</span> NearFirewall
 
 <span class="t-muted"># In NEAR.AI agent loop</span>
 firewall = NearFirewall(vault=<span class="t-str">"longdata4360.testnet"</span>, max_pertx=<span class="t-num">2.0</span>)
@@ -348,7 +348,7 @@ firewall = NearFirewall(vault=<span class="t-str">"longdata4360.testnet"</span>,
           <h3>5/5 Deterministic Security Gates Verified</h3>
           <p>Automated test suite proving prompt-injection interception, smart contract allowlist enforcement, spending limit escalation, and instant circuit breaker freeze.</p>
           <div class="judge-cmd-strip">
-            <code>git clone https://github.com/hng/agent-guard &amp;&amp; cd agent-guard &amp;&amp; npm test</code>
+            <code>git clone https://github.com/nimrid/NearWarden &amp;&amp; cd NearWarden &amp;&amp; npm test</code>
           </div>
         </div>
         <div class="judge-cta-right">
@@ -880,9 +880,9 @@ firewall = NearFirewall(vault=<span class="t-str">"longdata4360.testnet"</span>,
               <span class="terminal-lang">javascript</span>
               <button class="btn btn-default btn-xs" onclick="navigator.clipboard.writeText(document.getElementById('code-snippet-sdk').innerText)">Copy</button>
             </div>
-            <pre><code id="code-snippet-sdk">import { AgentGuard } from 'agent-guard';
+            <pre><code id="code-snippet-sdk">import { NearWarden } from 'near-warden';
 
-const guard = new AgentGuard({
+const guard = new NearWarden({
   contractId: 'longdata4360.testnet',
   networkId: 'testnet',
   useTeeSigner: true,

@@ -1,5 +1,5 @@
 {
-  "name": "@agent-guard/sdk",
+  "name": "@near-warden/sdk",
   "version": "1.0.0",
   "description": "NearWarden AI Firewall and Policy Enforcement SDK for Autonomous Agents on NEAR",
   "type": "module",

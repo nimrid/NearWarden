@@ -72,7 +72,7 @@ test('ElizaOS Middleware - Approves safe DeFi action and halts prompt injection'
   const guard = devGuard();
   const plugin = createElizaPlugin(guard);
 
-  assert.equal(plugin.name, 'agent-guard');
+  assert.equal(plugin.name, 'near-warden');
   assert.equal(typeof plugin.validateAction, 'function');
 
   // Test safe swap

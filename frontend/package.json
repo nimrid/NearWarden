@@ -1,5 +1,5 @@
 {
-  "name": "agent-guard-cockpit",
+  "name": "near-warden-cockpit",
   "version": "1.0.0",
   "description": "NearWarden Cyberpunk Security Cockpit and Testnet Vault Console",
   "scripts": {

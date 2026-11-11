@@ -110,7 +110,7 @@ const state = {
   expandedRows: new Set(),
   pendingActions: [],
   evaluatedGates: new Set(),
-  registeredPasskey: JSON.parse(localStorage.getItem('agentguard_passkey') || 'null'),
+  registeredPasskey: JSON.parse(localStorage.getItem('nearwarden_passkey') || localStorage.getItem('agentguard_passkey') || 'null'),
   auditLog: []
 };
 
@@ -695,7 +695,7 @@ window.registerSupervisorPasskey = async () => {
         registeredAt: new Date().toISOString(),
       };
       state.registeredPasskey = passkeyData;
-      localStorage.setItem('agentguard_passkey', JSON.stringify(passkeyData));
+      localStorage.setItem('nearwarden_passkey', JSON.stringify(passkeyData));
 
       updatePasskeyBadgeUI();
 
@@ -1380,7 +1380,7 @@ async function queryNearRpc(contractId, methodName, argsObj = {}) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       jsonrpc: '2.0',
-      id: 'agentguard-query',
+      id: 'nearwarden-query',
       method: 'query',
       params: {
         request_type: 'call_function',
